@@ -20,6 +20,20 @@ model Microblog {
   images    Image[]  // 关联的图片
   likes     Like[]   // 关联的点赞
   comments  Comment[] // 关联的评论
+  userId    String   // 发布用户的ID
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique // 用户名
+  email     String   @unique // 邮箱
+  password  String?  // 密码（管理员需要）
+  isAdmin   Boolean  @default(false) // 是否为管理员
+  microblogs Microblog[] // 发布的微博
+  comments  Comment[] // 发表的评论
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -45,5 +59,9 @@ model Comment {
   content     String   // 评论内容
   microblogId String   // 关联的微博ID
   microblog   Microblog @relation(fields: [microblogId], references: [id], onDelete: Cascade)
+  userId      String?  // 评论用户的ID（可选，游客评论为空）
+  user        User?    @relation(fields: [userId], references: [id])
+  guestName   String?  // 游客用户名
+  guestEmail  String?  // 游客邮箱
   createdAt   DateTime @default(now())
 }

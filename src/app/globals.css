@@ -169,3 +169,149 @@
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Markdown 样式优化 */
+.prose {
+  color: hsl(var(--foreground));
+}
+
+.prose h1 {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+  margin-top: 0;
+}
+
+.prose h2 {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  font-size: 1.25em;
+  margin-bottom: 0.5em;
+  margin-top: 1.5em;
+}
+
+.prose h3 {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+  font-size: 1.1em;
+  margin-bottom: 0.5em;
+  margin-top: 1.5em;
+}
+
+.prose p {
+  margin-bottom: 1em;
+  line-height: 1.6;
+}
+
+.prose ul, .prose ol {
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-bottom: 0.25em;
+}
+
+.prose blockquote {
+  border-left: 4px solid hsl(var(--primary));
+  padding-left: 1em;
+  margin: 1em 0;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.prose code {
+  background-color: hsl(var(--muted) / 0.5);
+  padding: 0.2em 0.4em;
+  border-radius: 0.25em;
+  font-size: 0.9em;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.prose pre {
+  background-color: hsl(var(--muted) / 0.3);
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5em;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+  border: none;
+}
+
+.prose a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+}
+
+.prose a:hover {
+  color: hsl(var(--primary) / 0.8);
+}
+
+.prose strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+.prose em {
+  font-style: italic;
+  color: hsl(var(--foreground));
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid hsl(var(--border));
+  margin: 2em 0;
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+}
+
+.prose th, .prose td {
+  border: 1px solid hsl(var(--border));
+  padding: 0.5em 1em;
+  text-align: left;
+}
+
+.prose th {
+  background-color: hsl(var(--muted) / 0.5);
+  font-weight: 600;
+}
+
+/* 暗色模式下的 Markdown 样式 */
+.dark .prose {
+  color: hsl(var(--foreground));
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose strong,
+.dark .prose em {
+  color: hsl(var(--foreground));
+}
+
+.dark .prose blockquote {
+  color: hsl(var(--muted-foreground));
+}
+
+.dark .prose code {
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.dark .prose pre {
+  background-color: hsl(var(--muted) / 0.2);
+  border-color: hsl(var(--border));
+}
+
+.dark .prose th {
+  background-color: hsl(var(--muted) / 0.3);
+}

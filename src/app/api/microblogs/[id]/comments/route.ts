@@ -23,6 +23,15 @@ export async function GET(
     // 获取评论列表
     const comments = await db.comment.findMany({
       where: { microblogId: id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            isAdmin: true
+          }
+        }
+      },
       orderBy: {
         createdAt: 'desc'
       }
@@ -44,7 +53,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const { content } = await request.json()
+    const { content, userId, guestName, guestEmail } = await request.json()
 
     if (!content || !content.trim()) {
       return NextResponse.json(
@@ -65,11 +74,53 @@ export async function POST(
       )
     }
 
+    // 验证评论者信息
+    let user = null
+    if (userId) {
+      // 登录用户评论
+      user = await db.user.findUnique({
+        where: { id: userId }
+      })
+      
+      if (!user) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        )
+      }
+    } else if (guestName && guestEmail) {
+      // 游客评论，验证邮箱格式
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(guestEmail)) {
+        return NextResponse.json(
+          { error: 'Invalid email format' },
+          { status: 400 }
+        )
+      }
+    } else {
+      return NextResponse.json(
+        { error: 'Either userId or guestName and guestEmail are required' },
+        { status: 400 }
+      )
+    }
+
     // 创建评论
     const comment = await db.comment.create({
       data: {
         content: content.trim(),
-        microblogId: id
+        microblogId: id,
+        userId: userId || null,
+        guestName: guestName || null,
+        guestEmail: guestEmail || null
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            isAdmin: true
+          }
+        }
       }
     })
 
