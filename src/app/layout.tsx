@@ -14,21 +14,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "My Weibo - Personal Microblog",
+  description: "A personal microblog built with Next.js, Prisma, and Tailwind CSS for sharing short updates and images.",
+  keywords: ["microblog", "Next.js", "Prisma", "Tailwind CSS", "personal website", "React"],
+  authors: [{ name: "My Weibo" }],
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "My Weibo",
+    description: "Share life moments with a modern personal microblog platform.",
+    url: "https://my-weibo.example.com",
+    siteName: "My Weibo",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "My Weibo",
+    description: "Share life moments with a modern personal microblog platform.",
   },
 };
 
