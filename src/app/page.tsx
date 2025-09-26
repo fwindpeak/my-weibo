@@ -3,11 +3,12 @@
 import { ChangeEvent, useEffect, useState } from 'react'
 import 'highlight.js/styles/github.css'
 import LoginModal from '@/components/auth/login-modal'
-import UserInfo from '@/components/auth/user-info'
 import HomeHeader from './_components/home-header'
 import CreateMicroblogCard from './_components/create-microblog-card'
 import MicroblogList from './_components/microblog-list'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
+import { MessageBox } from '@/components/ui/message-box'
+import { LogOut, Trash2 } from 'lucide-react'
 
 export default function Home() {
   const [content, setContent] = useState('')
@@ -32,6 +33,9 @@ export default function Home() {
   const [isSearching, setIsSearching] = useState(false)
   const [isSearchBarVisible, setIsSearchBarVisible] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [microblogToDelete, setMicroblogToDelete] = useState<string | null>(null)
+  const [isDeletingMicroblog, setIsDeletingMicroblog] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -333,8 +337,17 @@ export default function Home() {
     setCommentLoginModal({})
   }
 
-  const handleLogout = () => {
+  const requestLogout = () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = () => {
     setUser(null)
+    setShowLogoutConfirm(false)
+  }
+
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false)
   }
 
   const startEditingMicroblog = (microblogId: string, currentContent: string) => {
@@ -342,19 +355,22 @@ export default function Home() {
     setEditingContent((prev) => ({ ...prev, [microblogId]: currentContent }))
   }
 
-  const deleteMicroblog = async (microblogId: string) => {
+  const requestDeleteMicroblog = (microblogId: string) => {
     if (!user) {
       setShowLoginModal(true)
       return
     }
 
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm('确认删除这条微博吗？')
-      if (!confirmed) return
-    }
+    setMicroblogToDelete(microblogId)
+  }
+
+  const confirmDeleteMicroblog = async () => {
+    if (!user || !microblogToDelete) return
+
+    setIsDeletingMicroblog(true)
 
     try {
-      const response = await fetch(`/api/microblogs/${microblogId}`, {
+      const response = await fetch(`/api/microblogs/${microblogToDelete}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -365,15 +381,15 @@ export default function Home() {
       })
 
       if (response.ok) {
-        setMicroblogs((prev) => prev.filter((blog) => blog.id !== microblogId))
+        setMicroblogs((prev) => prev.filter((blog) => blog.id !== microblogToDelete))
         setEditingMicroblog((prev) => {
           const updated = { ...prev }
-          delete updated[microblogId]
+          delete updated[microblogToDelete]
           return updated
         })
         setEditingContent((prev) => {
           const updated = { ...prev }
-          delete updated[microblogId]
+          delete updated[microblogToDelete]
           return updated
         })
       } else {
@@ -381,7 +397,15 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error deleting microblog:', error)
+    } finally {
+      setIsDeletingMicroblog(false)
+      setMicroblogToDelete(null)
     }
+  }
+
+  const cancelDeleteMicroblog = () => {
+    if (isDeletingMicroblog) return
+    setMicroblogToDelete(null)
   }
 
   const cancelEditing = (microblogId: string) => {
@@ -609,11 +633,10 @@ export default function Home() {
         onClearSearch={clearSearch}
         onScrollTop={scrollToTop}
         onLoginClick={() => setShowLoginModal(true)}
+        onLogoutClick={requestLogout}
       />
 
       <div className="container mx-auto max-w-2xl px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
-        <UserInfo user={user} onLogout={handleLogout} onShowLogin={() => setShowLoginModal(true)} />
-
         {user && user.isAdmin && (
           <CreateMicroblogCard
             content={content}
@@ -653,7 +676,7 @@ export default function Home() {
           onCancelEditing={cancelEditing}
           onSaveEdit={saveEdit}
           onEditContentChange={handleEditContentChange}
-          onDeleteMicroblog={deleteMicroblog}
+          onDeleteMicroblog={requestDeleteMicroblog}
           onStartEditComment={startEditingComment}
           onCancelEditComment={cancelEditingComment}
           onEditCommentChange={handleEditCommentChange}
@@ -678,6 +701,30 @@ export default function Home() {
           onLogin={handleLogin}
         />
       ))}
+
+      <MessageBox
+        open={showLogoutConfirm}
+        title="确认退出登录"
+        description="退出后将无法执行管理员操作，确定要继续吗？"
+        confirmText="退出登录"
+        cancelText="暂不退出"
+        icon={<LogOut className="h-6 w-6" />}
+        onConfirm={confirmLogout}
+        onCancel={cancelLogout}
+      />
+
+      <MessageBox
+        open={Boolean(microblogToDelete)}
+        title="删除微博"
+        description="删除后将无法恢复这条微博，确定要删除吗？"
+        confirmText="确认删除"
+        cancelText="保留微博"
+        variant="destructive"
+        loading={isDeletingMicroblog}
+        icon={<Trash2 className="h-6 w-6" />}
+        onConfirm={confirmDeleteMicroblog}
+        onCancel={cancelDeleteMicroblog}
+      />
     </div>
   )
 }
