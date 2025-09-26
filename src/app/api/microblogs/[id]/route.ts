@@ -23,6 +23,18 @@ export async function PUT(
       )
     }
 
+    const requestingUser = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isAdmin: true,
+      },
+    })
+
+    if (!requestingUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     // 检查微博是否存在
     const microblog = await db.microblog.findUnique({
       where: { id },
@@ -45,7 +57,7 @@ export async function PUT(
     }
 
     // 检查用户是否有权限编辑（只有作者可以编辑）
-    if (microblog.userId !== userId) {
+    if (!requestingUser.isAdmin && microblog.userId !== userId) {
       return NextResponse.json(
         { error: 'You can only edit your own microblogs' },
         { status: 403 }
@@ -109,6 +121,18 @@ export async function DELETE(
       )
     }
 
+    const requestingUser = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isAdmin: true,
+      },
+    })
+
+    if (!requestingUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
     // 检查微博是否存在
     const microblog = await db.microblog.findUnique({
       where: { id },
@@ -131,7 +155,7 @@ export async function DELETE(
     }
 
     // 检查用户是否有权限删除（只有作者可以删除）
-    if (microblog.userId !== userId) {
+    if (!requestingUser.isAdmin && microblog.userId !== userId) {
       return NextResponse.json(
         { error: 'You can only delete your own microblogs' },
         { status: 403 }
