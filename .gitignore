@@ -47,6 +47,6 @@ test
 prompt
 
 server.log
-
-/public/uploads
 /db/
+/public/uploads
+/prisma/db/
