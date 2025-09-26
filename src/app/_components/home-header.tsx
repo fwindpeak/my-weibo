@@ -5,8 +5,9 @@ import { useEffect, useRef } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AppUser } from '@/types/microblog'
-import { LogIn, MessageCircle, Search, X } from 'lucide-react'
+import { LogIn, LogOut, MessageCircle, Search, ShieldCheck, User2, X } from 'lucide-react'
 
 interface HomeHeaderProps {
   searchTerm: string
@@ -20,6 +21,7 @@ interface HomeHeaderProps {
   onClearSearch: () => void
   onScrollTop: () => void
   onLoginClick: () => void
+  onLogoutClick: () => void
 }
 
 export default function HomeHeader({
@@ -34,6 +36,7 @@ export default function HomeHeader({
   onClearSearch,
   onScrollTop,
   onLoginClick,
+  onLogoutClick,
 }: HomeHeaderProps) {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -141,9 +144,41 @@ export default function HomeHeader({
                 </Badge>
               )}
               {user ? (
-                <Badge variant="outline" className="hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px]">
-                  {user.isAdmin ? '管理员已登录' : `${user.username}`}
-                </Badge>
+                <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 shadow-sm">
+                  <Avatar className="h-8 w-8 border border-primary/30">
+                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
+                      {user.username.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-[11px] font-medium text-muted-foreground sm:hidden">
+                    {user.isAdmin ? '管理员' : '已登录'}
+                  </span>
+                  <div className="hidden text-left sm:flex sm:flex-col sm:leading-tight">
+                    <span className="text-xs font-medium text-foreground">{user.username}</span>
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      {user.isAdmin ? (
+                        <>
+                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                          管理员
+                        </>
+                      ) : (
+                        <>
+                          <User2 className="h-3.5 w-3.5" />访客
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={onLogoutClick}
+                    data-interactive="true"
+                  >
+                    <LogOut className="mr-1 h-3.5 w-3.5" />
+                    退出
+                  </Button>
+                </div>
               ) : (
                 <Button
                   variant="outline"

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react'
 import MonacoEditorWrapper from '@/components/ui/monaco-editor-wrapper'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 interface MicroblogCardProps {
   microblog: Microblog
@@ -70,6 +72,7 @@ export default function MicroblogCard({
   onDeleteComment,
 }: MicroblogCardProps) {
   const guestInfo = getGuestInfo(microblog.id)
+  const [previewImage, setPreviewImage] = useState<{ url: string; altText: string } | null>(null)
   const handleGuestKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -161,14 +164,25 @@ export default function MicroblogCard({
             }`}
           >
             {microblog.images.map((image) => (
-              <div key={image.id} className="relative group overflow-hidden rounded-lg">
+              <button
+                key={image.id}
+                type="button"
+                onClick={() => setPreviewImage({ url: image.url, altText: image.altText })}
+                className={cn(
+                  'relative group overflow-hidden rounded-lg focus:outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-primary/60',
+                )}
+                aria-label="查看大图"
+              >
                 <img
                   src={image.url}
                   alt={image.altText}
                   className="w-full h-40 sm:h-48 object-cover transition-transform duration-300 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>
-              </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-medium text-white transition-all duration-300 group-hover:bg-black/40 group-hover:text-white">
+                  <span className="opacity-0 group-hover:opacity-100">点击查看大图</span>
+                </div>
+              </button>
             ))}
           </div>
         )}
@@ -361,6 +375,27 @@ export default function MicroblogCard({
           </div>
         )}
       </CardContent>
+
+      <Dialog
+        open={Boolean(previewImage)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewImage(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl border-none bg-background/95 p-0 shadow-xl">
+          {previewImage ? (
+            <div className="flex max-h-[80vh] w-full items-center justify-center bg-black">
+              <img
+                src={previewImage.url}
+                alt={previewImage.altText}
+                className="max-h-[80vh] w-full object-contain"
+              />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
