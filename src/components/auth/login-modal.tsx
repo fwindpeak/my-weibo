@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { X, User, Lock, Shield } from 'lucide-react'
+import { X, User, Lock } from 'lucide-react'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -82,9 +81,8 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         </Button>
 
         <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            管理员登录
+          <CardTitle className="text-base">
+            身份验证
           </CardTitle>
         </CardHeader>
 
@@ -139,15 +137,9 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
             >
               {isLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-              ) : (
-                <Shield className="w-4 h-4 mr-2" />
-              )}
-              管理员登录
+              ) : null}
+              进入
             </Button>
-
-            <div className="text-center text-xs text-muted-foreground">
-              <p>管理员需要输入账号和密码</p>
-            </div>
           </form>
         </CardContent>
       </Card>
