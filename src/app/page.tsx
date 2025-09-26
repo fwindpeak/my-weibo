@@ -24,10 +24,13 @@ export default function Home() {
   const [commentLoginModal, setCommentLoginModal] = useState<Record<string, boolean>>({})
   const [editingMicroblog, setEditingMicroblog] = useState<Record<string, boolean>>({})
   const [editingContent, setEditingContent] = useState<Record<string, string>>({})
+  const [editingComments, setEditingComments] = useState<Record<string, boolean>>({})
+  const [editingCommentContent, setEditingCommentContent] = useState<Record<string, string>>({})
   const [commentGuestInfo, setCommentGuestInfo] = useState<Record<string, GuestIdentity>>({})
   const [guestIdentity, setGuestIdentity] = useState<GuestIdentity>({ name: '', email: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearching, setIsSearching] = useState(false)
+  const [isSearchBarVisible, setIsSearchBarVisible] = useState(false)
   const [showScrollTop, setShowScrollTop] = useState(false)
 
   useEffect(() => {
@@ -84,6 +87,9 @@ export default function Home() {
   const handleSearch = async (term: string) => {
     setSearchTerm(term)
     if (term.trim()) {
+      if (!isSearchBarVisible) {
+        setIsSearchBarVisible(true)
+      }
       setIsSearching(true)
       await fetchMicroblogs(term)
     } else {
@@ -96,6 +102,16 @@ export default function Home() {
     setSearchTerm('')
     setIsSearching(false)
     await fetchMicroblogs()
+  }
+
+  const handleToggleSearchVisibility = () => {
+    setIsSearchBarVisible((prev) => {
+      const next = !prev
+      if (prev) {
+        clearSearch()
+      }
+      return next
+    })
   }
 
   const scrollToTop = () => {
@@ -321,6 +337,53 @@ export default function Home() {
     setUser(null)
   }
 
+  const startEditingMicroblog = (microblogId: string, currentContent: string) => {
+    setEditingMicroblog((prev) => ({ ...prev, [microblogId]: true }))
+    setEditingContent((prev) => ({ ...prev, [microblogId]: currentContent }))
+  }
+
+  const deleteMicroblog = async (microblogId: string) => {
+    if (!user) {
+      setShowLoginModal(true)
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('确认删除这条微博吗？')
+      if (!confirmed) return
+    }
+
+    try {
+      const response = await fetch(`/api/microblogs/${microblogId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+        }),
+      })
+
+      if (response.ok) {
+        setMicroblogs((prev) => prev.filter((blog) => blog.id !== microblogId))
+        setEditingMicroblog((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogId]
+          return updated
+        })
+        setEditingContent((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogId]
+          return updated
+        })
+      } else {
+        console.error('Failed to delete microblog')
+      }
+    } catch (error) {
+      console.error('Error deleting microblog:', error)
+    }
+  }
+
   const cancelEditing = (microblogId: string) => {
     setEditingMicroblog((prev) => ({ ...prev, [microblogId]: false }))
     setEditingContent((prev) => ({ ...prev, [microblogId]: '' }))
@@ -355,6 +418,119 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error updating microblog:', error)
+    }
+  }
+
+  const startEditingComment = (
+    _microblogId: string,
+    commentId: string,
+    content: string,
+  ) => {
+    setEditingComments((prev) => ({ ...prev, [commentId]: true }))
+    setEditingCommentContent((prev) => ({ ...prev, [commentId]: content }))
+  }
+
+  const cancelEditingComment = (commentId: string) => {
+    setEditingComments((prev) => {
+      const updated = { ...prev }
+      delete updated[commentId]
+      return updated
+    })
+    setEditingCommentContent((prev) => {
+      const updated = { ...prev }
+      delete updated[commentId]
+      return updated
+    })
+  }
+
+  const handleEditCommentChange = (commentId: string, value: string) => {
+    setEditingCommentContent((prev) => ({ ...prev, [commentId]: value }))
+  }
+
+  const saveCommentEdit = async (microblogId: string, commentId: string) => {
+    if (!user) {
+      setShowLoginModal(true)
+      return
+    }
+
+    if (!editingCommentContent[commentId]?.trim()) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: editingCommentContent[commentId],
+          userId: user.id,
+        }),
+      })
+
+      if (response.ok) {
+        const updatedComment = await response.json()
+        setMicroblogs((prev) =>
+          prev.map((blog) =>
+            blog.id === microblogId
+              ? {
+                  ...blog,
+                  comments: blog.comments.map((comment) =>
+                    comment.id === commentId ? updatedComment : comment,
+                  ),
+                }
+              : blog,
+          ),
+        )
+        cancelEditingComment(commentId)
+      } else {
+        console.error('Failed to update comment')
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error)
+    }
+  }
+
+  const deleteComment = async (microblogId: string, commentId: string) => {
+    if (!user) {
+      setShowLoginModal(true)
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('确认删除这条评论吗？')
+      if (!confirmed) return
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+        }),
+      })
+
+      if (response.ok) {
+        setMicroblogs((prev) =>
+          prev.map((blog) =>
+            blog.id === microblogId
+              ? {
+                  ...blog,
+                  comments: blog.comments.filter((comment) => comment.id !== commentId),
+                }
+              : blog,
+          ),
+        )
+        cancelEditingComment(commentId)
+      } else {
+        console.error('Failed to delete comment')
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error)
     }
   }
 
@@ -425,9 +601,11 @@ export default function Home() {
         searchTerm={searchTerm}
         isSearching={isSearching}
         user={user}
+        isSearchVisible={isSearchBarVisible}
         showScrollTop={showScrollTop}
         onSearchChange={handleSearch}
         onSearchClick={() => handleSearch(searchTerm)}
+        onToggleSearch={handleToggleSearchVisibility}
         onClearSearch={clearSearch}
         onScrollTop={scrollToTop}
         onLoginClick={() => setShowLoginModal(true)}
@@ -460,6 +638,8 @@ export default function Home() {
           commentLoading={commentLoading}
           editingMicroblog={editingMicroblog}
           editingContent={editingContent}
+          editingComments={editingComments}
+          editingCommentContent={editingCommentContent}
           user={user}
           getGuestInfo={getGuestInfo}
           formatTime={formatTime}
@@ -469,9 +649,16 @@ export default function Home() {
           onCommentInputChange={handleCommentInput}
           onSubmitComment={handleSubmitComment}
           onCommentGuestInfoChange={handleCommentGuestInfoChange}
+          onStartEditing={startEditingMicroblog}
           onCancelEditing={cancelEditing}
           onSaveEdit={saveEdit}
           onEditContentChange={handleEditContentChange}
+          onDeleteMicroblog={deleteMicroblog}
+          onStartEditComment={startEditingComment}
+          onCancelEditComment={cancelEditingComment}
+          onEditCommentChange={handleEditCommentChange}
+          onSaveEditComment={saveCommentEdit}
+          onDeleteComment={deleteComment}
         />
       </div>
 

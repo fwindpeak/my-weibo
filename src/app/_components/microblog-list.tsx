@@ -14,6 +14,8 @@ interface MicroblogListProps {
   commentLoading: Record<string, boolean>
   editingMicroblog: Record<string, boolean>
   editingContent: Record<string, string>
+  editingComments: Record<string, boolean>
+  editingCommentContent: Record<string, string>
   user: AppUser | null
   getGuestInfo: (microblogId: string) => GuestIdentity
   formatTime: (dateString: string) => string
@@ -23,9 +25,16 @@ interface MicroblogListProps {
   onCommentInputChange: (microblogId: string, value: string) => void
   onSubmitComment: (microblogId: string) => void
   onCommentGuestInfoChange: (microblogId: string, field: 'name' | 'email', value: string) => void
+  onStartEditing: (microblogId: string, content: string) => void
   onCancelEditing: (microblogId: string) => void
   onSaveEdit: (microblogId: string) => void
   onEditContentChange: (microblogId: string, value: string) => void
+  onDeleteMicroblog: (microblogId: string) => void
+  onStartEditComment: (microblogId: string, commentId: string, content: string) => void
+  onCancelEditComment: (commentId: string) => void
+  onEditCommentChange: (commentId: string, value: string) => void
+  onSaveEditComment: (microblogId: string, commentId: string) => void
+  onDeleteComment: (microblogId: string, commentId: string) => void
 }
 
 export default function MicroblogList({
@@ -37,6 +46,8 @@ export default function MicroblogList({
   commentLoading,
   editingMicroblog,
   editingContent,
+  editingComments,
+  editingCommentContent,
   user,
   getGuestInfo,
   formatTime,
@@ -46,9 +57,16 @@ export default function MicroblogList({
   onCommentInputChange,
   onSubmitComment,
   onCommentGuestInfoChange,
+  onStartEditing,
   onCancelEditing,
   onSaveEdit,
   onEditContentChange,
+  onDeleteMicroblog,
+  onStartEditComment,
+  onCancelEditComment,
+  onEditCommentChange,
+  onSaveEditComment,
+  onDeleteComment,
 }: MicroblogListProps) {
   return (
     <div className="space-y-3 sm:space-y-4">
@@ -88,6 +106,8 @@ export default function MicroblogList({
             commentLoading={Boolean(commentLoading[microblog.id])}
             editing={Boolean(editingMicroblog[microblog.id])}
             editingContent={editingContent[microblog.id] || ''}
+            editingComments={editingComments}
+            editingCommentContent={editingCommentContent}
             user={user}
             getGuestInfo={getGuestInfo}
             formatTime={formatTime}
@@ -97,9 +117,16 @@ export default function MicroblogList({
             onCommentInputChange={onCommentInputChange}
             onSubmitComment={onSubmitComment}
             onCommentGuestInfoChange={onCommentGuestInfoChange}
+            onStartEditing={onStartEditing}
             onCancelEditing={onCancelEditing}
             onSaveEdit={onSaveEdit}
             onEditContentChange={onEditContentChange}
+            onDeleteMicroblog={onDeleteMicroblog}
+            onStartEditComment={onStartEditComment}
+            onCancelEditComment={onCancelEditComment}
+            onEditCommentChange={onEditCommentChange}
+            onSaveEditComment={onSaveEditComment}
+            onDeleteComment={onDeleteComment}
           />
         ))
       )}

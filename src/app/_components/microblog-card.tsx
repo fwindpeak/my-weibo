@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Heart, MessageCircle } from 'lucide-react'
+import { Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react'
 import MonacoEditorWrapper from '@/components/ui/monaco-editor-wrapper'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 
@@ -17,6 +17,8 @@ interface MicroblogCardProps {
   commentLoading: boolean
   editing: boolean
   editingContent: string
+  editingComments: Record<string, boolean>
+  editingCommentContent: Record<string, string>
   user: AppUser | null
   getGuestInfo: (microblogId: string) => GuestIdentity
   formatTime: (dateString: string) => string
@@ -26,9 +28,16 @@ interface MicroblogCardProps {
   onCommentInputChange: (microblogId: string, value: string) => void
   onSubmitComment: (microblogId: string) => void
   onCommentGuestInfoChange: (microblogId: string, field: 'name' | 'email', value: string) => void
+  onStartEditing: (microblogId: string, content: string) => void
   onCancelEditing: (microblogId: string) => void
   onSaveEdit: (microblogId: string) => void
   onEditContentChange: (microblogId: string, value: string) => void
+  onDeleteMicroblog: (microblogId: string) => void
+  onStartEditComment: (microblogId: string, commentId: string, content: string) => void
+  onCancelEditComment: (commentId: string) => void
+  onEditCommentChange: (commentId: string, value: string) => void
+  onSaveEditComment: (microblogId: string, commentId: string) => void
+  onDeleteComment: (microblogId: string, commentId: string) => void
 }
 
 export default function MicroblogCard({
@@ -38,6 +47,8 @@ export default function MicroblogCard({
   commentLoading,
   editing,
   editingContent,
+  editingComments,
+  editingCommentContent,
   user,
   getGuestInfo,
   formatTime,
@@ -47,9 +58,16 @@ export default function MicroblogCard({
   onCommentInputChange,
   onSubmitComment,
   onCommentGuestInfoChange,
+  onStartEditing,
   onCancelEditing,
   onSaveEdit,
   onEditContentChange,
+  onDeleteMicroblog,
+  onStartEditComment,
+  onCancelEditComment,
+  onEditCommentChange,
+  onSaveEditComment,
+  onDeleteComment,
 }: MicroblogCardProps) {
   const guestInfo = getGuestInfo(microblog.id)
   const handleGuestKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -66,10 +84,36 @@ export default function MicroblogCard({
     }
   }
 
+  const canManageMicroblog = Boolean(
+    user?.isAdmin || (user && microblog.user && microblog.user.id === user.id),
+  )
+
   return (
     <Card className="hover:shadow-md transition-all duration-300 border-primary/10 hover:border-primary/20 bg-gradient-to-br from-background to-muted/5">
       <CardContent className="px-4 py-3 sm:px-5 sm:py-4">
-        <div className="mb-2.5">
+        <div className="mb-2.5 flex flex-col gap-2">
+          {canManageMicroblog && !editing && (
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs"
+                onClick={() => onStartEditing(microblog.id, microblog.content)}
+              >
+                <Edit3 className="mr-1 h-3 w-3" />
+                编辑
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={() => onDeleteMicroblog(microblog.id)}
+              >
+                <Trash2 className="mr-1 h-3 w-3" />
+                删除
+              </Button>
+            </div>
+          )}
           {editing ? (
             <div className="space-y-3">
               <MonacoEditorWrapper
@@ -161,16 +205,77 @@ export default function MicroblogCard({
             {microblog.comments.length > 0 && (
               <div className="space-y-2.5 mb-3 max-h-60 overflow-y-auto custom-scrollbar">
                 {microblog.comments.map((comment) => (
-                  <div key={comment.id} className="bg-muted/30 px-3 py-2.5 rounded-lg text-sm">
-                    <div className="flex items-center gap-2 mb-2">
-                      {comment.user ? (
-                        <span className="font-medium text-xs text-foreground">{comment.user.username}</span>
-                      ) : (
-                        <span className="font-medium text-xs text-foreground">{comment.guestName}</span>
+                  <div key={comment.id} className="bg-muted/30 px-3 py-2.5 rounded-lg text-sm space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-col">
+                        {comment.user ? (
+                          <span className="font-medium text-xs text-foreground">{comment.user.username}</span>
+                        ) : (
+                          <span className="font-medium text-xs text-foreground">{comment.guestName}</span>
+                        )}
+                      </div>
+                      {(user?.isAdmin || (comment.user && user?.id === comment.user.id)) && (
+                        <div className="flex items-center gap-1">
+                          {!editingComments[comment.id] && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() =>
+                                  onStartEditComment(microblog.id, comment.id, comment.content)
+                                }
+                                aria-label="编辑评论"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => onDeleteComment(microblog.id, comment.id)}
+                                aria-label="删除评论"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
-                    <p className="text-foreground leading-relaxed">{comment.content}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    {editingComments[comment.id] ? (
+                      <div className="space-y-2">
+                        <textarea
+                          className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+                          rows={3}
+                          value={editingCommentContent[comment.id] || ''}
+                          onChange={(event) => onEditCommentChange(comment.id, event.target.value)}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2 text-xs"
+                            onClick={() => onCancelEditComment(comment.id)}
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-8 px-3 text-xs"
+                            disabled={!editingCommentContent[comment.id]?.trim()}
+                            onClick={() => onSaveEditComment(microblog.id, comment.id)}
+                          >
+                            保存
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                        {comment.content}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
                       <span
                         className="cursor-help hover:text-foreground transition-colors"
                         title={`评论时间：${formatFullTime(comment.createdAt)}`}
