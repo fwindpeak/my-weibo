@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { User, LogOut, Settings } from 'lucide-react'
+import { User, LogOut } from 'lucide-react'
 
 interface UserInfoProps {
   user: {
@@ -17,22 +17,7 @@ interface UserInfoProps {
 
 export default function UserInfo({ user, onLogout, onShowLogin }: UserInfoProps) {
   if (!user) {
-    return (
-      <div className="mb-4 sm:mb-6">
-        {/* 隐藏的管理员登录入口 */}
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onShowLogin}
-            className="h-6 w-6 p-0 text-muted-foreground/70 hover:text-foreground hover:bg-transparent"
-            aria-label="管理入口"
-          >
-            <Settings className="w-3 h-3" />
-          </Button>
-        </div>
-      </div>
-    )
+    return <div className="mb-3 sm:mb-4" />
   }
 
   return (

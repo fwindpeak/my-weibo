@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Heart, MessageCircle, Image as ImageIcon, Send, Eye, Edit3, Search, X } from 'lucide-react'
+import { ArrowUp, Heart, MessageCircle, Image as ImageIcon, Send, Eye, Edit3, Search, X, LogIn } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -69,7 +69,22 @@ export default function Home() {
   const [guestIdentity, setGuestIdentity] = useState<{ name: string; email: string }>({ name: '', email: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearching, setIsSearching] = useState(false)
-  const [showSearch, setShowSearch] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 120)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    handleScroll()
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
 
   // 加载微博列表
   useEffect(() => {
@@ -123,6 +138,11 @@ export default function Home() {
     setSearchTerm('')
     setIsSearching(false)
     await fetchMicroblogs()
+  }
+
+  const scrollToTop = () => {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -462,88 +482,117 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-      <div className="container mx-auto max-w-2xl p-4 sm:p-6 lg:p-8">
-        {/* 头部 */}
-        <header className="py-6 sm:py-8 text-center">
-          <div className="mb-4">
-            <div className="w-16 h-16 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <MessageCircle className="w-8 h-8 text-primary" />
+      <header
+        className={`fixed inset-x-0 top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-shadow ${showScrollTop ? 'shadow-sm' : ''}`}
+      >
+        <div className="container mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-2.5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                    我的微博
+                  </h1>
+                  <p className="text-[11px] leading-4 text-muted-foreground">
+                    记录生活点滴，分享精彩瞬间
+                  </p>
+                </div>
+              </div>
+              {showScrollTop && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={scrollToTop}
+                  className="sm:hidden"
+                  aria-label="返回顶部"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            我的微博
-          </h1>
-          <p className="text-muted-foreground text-center mt-2 text-sm sm:text-base">
-            记录生活点滴，分享精彩瞬间
-          </p>
-          
-          {/* 搜索功能 */}
-          <div className="mt-6 max-w-md mx-auto">
-            {showSearch ? (
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+              <div className="flex w-full items-center gap-2 sm:flex-1">
+                <div className="relative flex-1 min-w-[160px]">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="text"
                     placeholder="搜索内容..."
                     value={searchTerm}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-10 pr-10"
-                    autoFocus
+                    className="h-9 rounded-full border-muted-foreground/20 bg-background/80 pl-10 pr-10 text-sm"
                   />
                   {searchTerm && (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={clearSearch}
-                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                      className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2"
                     >
                       <X className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
                 <Button
-                  variant="ghost"
                   size="sm"
-                  onClick={() => setShowSearch(false)}
-                  className="h-9 w-9 p-0"
+                  className="h-9 rounded-full px-3 text-xs whitespace-nowrap"
+                  onClick={() => handleSearch(searchTerm)}
                 >
-                  <X className="h-4 w-4" />
+                  <Search className="mr-1 h-3 w-3" />
+                  搜索
                 </Button>
+                {showScrollTop && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={scrollToTop}
+                    className="hidden sm:flex"
+                    aria-label="返回顶部"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowSearch(true)}
-                className="text-xs"
-              >
-                <Search className="h-3 w-3 mr-2" />
-                搜索
-              </Button>
-            )}
-          </div>
-          
-          {/* 搜索状态提示 */}
-          {isSearching && (
-            <div className="mt-2">
-              <Badge variant="secondary" className="text-xs">
-                搜索结果: "{searchTerm}"
-              </Badge>
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                {isSearching && (
+                  <Badge variant="secondary" className="w-fit rounded-full px-2 py-0.5 text-[11px]">
+                    搜索结果: "{searchTerm}"
+                  </Badge>
+                )}
+                {user ? (
+                  <Badge variant="outline" className="hidden sm:inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px]">
+                    {user.isAdmin ? '管理员已登录' : `${user.username}`}
+                  </Badge>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 rounded-full px-3 text-xs"
+                    onClick={() => setShowLoginModal(true)}
+                  >
+                    <LogIn className="mr-1 h-3 w-3" />
+                    管理登录
+                  </Button>
+                )}
+              </div>
             </div>
-          )}
-        </header>
+          </div>
+        </div>
+      </header>
 
+      <div className="container mx-auto max-w-2xl px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
         {/* 用户信息 */}
-        <UserInfo 
-          user={user} 
+        <UserInfo
+          user={user}
           onLogout={handleLogout}
           onShowLogin={() => setShowLoginModal(true)}
         />
 
         {/* 发布区域 - 只有管理员才能发表微博 */}
         {user && user.isAdmin && (
-          <Card className="mb-4 sm:mb-6 shadow-md border-primary/20 hover:shadow-lg transition-all duration-300">
+          <Card className="mb-3 sm:mb-4 shadow-md border-primary/20 hover:shadow-lg transition-all duration-300">
             {false && (<CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
@@ -554,7 +603,7 @@ export default function Home() {
               </CardTitle>
             </CardHeader>)
             }
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2.5">
               {/* 编辑器区域 */}
               <div className="space-y-2">
                 {!showPreview ? (
@@ -632,7 +681,7 @@ export default function Home() {
             
             {/* 预览选中的图片 */}
             {selectedImages.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-muted/30 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-muted/30 rounded-lg">
                 {selectedImages.map((file, index) => (
                   <div key={index} className="relative group">
                     <img
@@ -672,7 +721,7 @@ export default function Home() {
         )}
 
         {/* 微博列表 */}
-        <div className="space-y-4 sm:space-y-6">
+        <div className="space-y-3 sm:space-y-4">
           {isLoading ? (
             <Card className="animate-pulse">
               <CardContent className="py-12 text-center">
@@ -705,9 +754,9 @@ export default function Home() {
                 key={microblog.id} 
                 className="hover:shadow-md transition-all duration-300 border-primary/10 hover:border-primary/20 bg-gradient-to-br from-background to-muted/5"
               >
-                <CardContent className="pt-4 pb-4">
+                <CardContent className="px-4 py-3 sm:px-5 sm:py-4">
                   {/* 内容显示区域 */}
-                  <div className="mb-3">
+                  <div className="mb-2.5">
                     {editingMicroblog[microblog.id] ? (
                       <div className="space-y-3">
                         {/* 编辑器区域 */}
@@ -755,7 +804,7 @@ export default function Home() {
                   
                   {/* 图片展示 */}
                   {microblog.images.length > 0 && (
-                    <div className={`grid gap-2 mb-3 ${
+                    <div className={`grid gap-1.5 mb-2.5 ${
                       microblog.images.length === 1 ? 'grid-cols-1' :
                       microblog.images.length === 2 ? 'grid-cols-2' :
                       'grid-cols-2 sm:grid-cols-3'
@@ -774,7 +823,7 @@ export default function Home() {
                   )}
                   
                   {/* 互动区域 */}
-                  <div className="flex items-center justify-between text-base text-muted-foreground pt-2 border-t border-border/50">
+                  <div className="flex items-center justify-between text-base text-muted-foreground pt-2.5 border-t border-border/50">
                     <div className="flex items-center gap-4">
                       <button 
                         onClick={() => handleLike(microblog.id)}
@@ -807,12 +856,12 @@ export default function Home() {
 
                   {/* 评论区域 */}
                   {expandedComments[microblog.id] && (
-                    <div className="mt-4 pt-4 border-t border-border animate-in slide-in-from-top-2 duration-300">
+                    <div className="mt-3 pt-3 border-t border-border animate-in slide-in-from-top-2 duration-300">
                       {/* 评论列表 */}
                       {microblog.comments.length > 0 && (
-                        <div className="space-y-3 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
+                        <div className="space-y-2.5 mb-3 max-h-60 overflow-y-auto custom-scrollbar">
                           {microblog.comments.map((comment) => (
-                            <div key={comment.id} className="bg-muted/30 p-3 rounded-lg text-sm">
+                            <div key={comment.id} className="bg-muted/30 px-3 py-2.5 rounded-lg text-sm">
                               {/* 评论用户信息 */}
                               <div className="flex items-center gap-2 mb-2">
                                 {comment.user ? (
@@ -846,7 +895,7 @@ export default function Home() {
                       {/* 评论输入区域 */}
                       {!user ? (
                         // 游客评论 - 需要填写用户名和邮箱
-                        <div className="space-y-3">
+                        <div className="space-y-2.5">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input
                               type="text"
@@ -863,7 +912,7 @@ export default function Home() {
                               className="px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                             />
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5">
                             <input
                               type="text"
                               placeholder="写下你的评论..."
@@ -898,7 +947,7 @@ export default function Home() {
                         </div>
                       ) : (
                         // 登录用户评论
-                        <div className="flex gap-2">
+                        <div className="flex gap-1.5">
                           <input
                             type="text"
                             placeholder="写下你的评论..."
