@@ -66,6 +66,7 @@ export default function Home() {
   const [editingMicroblog, setEditingMicroblog] = useState<{[key: string]: boolean}>({})
   const [editingContent, setEditingContent] = useState<{[key: string]: string}>({})
   const [commentGuestInfo, setCommentGuestInfo] = useState<{[key: string]: {name: string; email: string}}>({})
+  const [guestIdentity, setGuestIdentity] = useState<{ name: string; email: string }>({ name: '', email: '' })
   const [searchTerm, setSearchTerm] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -73,6 +74,22 @@ export default function Home() {
   // 加载微博列表
   useEffect(() => {
     fetchMicroblogs()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem('guestIdentity')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setGuestIdentity({
+          name: parsed?.name || '',
+          email: parsed?.email || ''
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load guest identity:', error)
+    }
   }, [])
 
   const fetchMicroblogs = async (search?: string) => {
@@ -207,6 +224,17 @@ export default function Home() {
       ...prev,
       [microblogId]: !prev[microblogId]
     }))
+    setCommentGuestInfo(prev => {
+      if (prev[microblogId]) return prev
+      if (!guestIdentity.name && !guestIdentity.email) return prev
+      return {
+        ...prev,
+        [microblogId]: {
+          name: guestIdentity.name,
+          email: guestIdentity.email
+        }
+      }
+    })
   }
 
   const handleSubmitComment = async (microblogId: string) => {
@@ -254,7 +282,7 @@ export default function Home() {
       }
     } else {
       // 游客评论，检查是否填写了用户名和邮箱
-      const guestInfo = commentGuestInfo[microblogId]
+      const guestInfo = commentGuestInfo[microblogId] || guestIdentity
       if (!guestInfo?.name?.trim() || !guestInfo?.email?.trim()) {
         alert('请填写用户名和邮箱')
         return
@@ -290,9 +318,18 @@ export default function Home() {
             ...prev,
             [microblogId]: ''
           }))
+
+          const normalizedIdentity = {
+            name: guestInfo.name.trim(),
+            email: guestInfo.email.trim()
+          }
+          setGuestIdentity(normalizedIdentity)
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('guestIdentity', JSON.stringify(normalizedIdentity))
+          }
           setCommentGuestInfo(prev => ({
             ...prev,
-            [microblogId]: { name: '', email: '' }
+            [microblogId]: normalizedIdentity
           }))
         } else {
           console.error('Failed to create comment')
@@ -365,14 +402,26 @@ export default function Home() {
   }
 
   const handleCommentGuestInfoChange = (microblogId: string, field: 'name' | 'email', value: string) => {
+    const updatedIdentity = {
+      ...guestIdentity,
+      [field]: value
+    }
+
+    setGuestIdentity(updatedIdentity)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('guestIdentity', JSON.stringify(updatedIdentity))
+    }
+
     setCommentGuestInfo(prev => ({
       ...prev,
       [microblogId]: {
-        ...(prev[microblogId] || { name: '', email: '' }),
+        ...(prev[microblogId] || updatedIdentity),
         [field]: value
       }
     }))
   }
+
+  const getGuestInfo = (microblogId: string) => commentGuestInfo[microblogId] ?? guestIdentity
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -436,7 +485,7 @@ export default function Home() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="text"
-                    placeholder="搜索微博内容..."
+                    placeholder="搜索内容..."
                     value={searchTerm}
                     onChange={(e) => handleSearch(e.target.value)}
                     className="pl-10 pr-10"
@@ -470,7 +519,7 @@ export default function Home() {
                 className="text-xs"
               >
                 <Search className="h-3 w-3 mr-2" />
-                搜索微博
+                搜索
               </Button>
             )}
           </div>
@@ -495,7 +544,7 @@ export default function Home() {
         {/* 发布区域 - 只有管理员才能发表微博 */}
         {user && user.isAdmin && (
           <Card className="mb-4 sm:mb-6 shadow-md border-primary/20 hover:shadow-lg transition-all duration-300">
-            <CardHeader className="pb-3">
+            {false && (<CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                 发布新微博
@@ -503,7 +552,8 @@ export default function Home() {
                   支持 Markdown
                 </Badge>
               </CardTitle>
-            </CardHeader>
+            </CardHeader>)
+            }
             <CardContent className="space-y-3">
               {/* 编辑器区域 */}
               <div className="space-y-2">
@@ -770,20 +820,12 @@ export default function Home() {
                                     <span className="font-medium text-xs text-foreground">
                                       {comment.user.username}
                                     </span>
-                                    {comment.user.isAdmin && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        管理员
-                                      </Badge>
-                                    )}
                                   </>
                                 ) : (
                                   <>
                                     <span className="font-medium text-xs text-foreground">
                                       {comment.guestName}
                                     </span>
-                                    <Badge variant="outline" className="text-xs">
-                                      游客
-                                    </Badge>
                                   </>
                                 )}
                               </div>
@@ -809,14 +851,14 @@ export default function Home() {
                             <input
                               type="text"
                               placeholder="你的名字"
-                              value={commentGuestInfo[microblog.id]?.name || ''}
+                              value={getGuestInfo(microblog.id).name}
                               onChange={(e) => handleCommentGuestInfoChange(microblog.id, 'name', e.target.value)}
                               className="px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                             />
                             <input
                               type="email"
                               placeholder="你的邮箱"
-                              value={commentGuestInfo[microblog.id]?.email || ''}
+                              value={getGuestInfo(microblog.id).email}
                               onChange={(e) => handleCommentGuestInfoChange(microblog.id, 'email', e.target.value)}
                               className="px-3 py-2 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
                             />
@@ -839,8 +881,8 @@ export default function Home() {
                               onClick={() => handleSubmitComment(microblog.id)}
                               disabled={
                                 !commentInputs[microblog.id]?.trim() || 
-                                !commentGuestInfo[microblog.id]?.name?.trim() || 
-                                !commentGuestInfo[microblog.id]?.email?.trim() ||
+                                !getGuestInfo(microblog.id).name.trim() || 
+                                !getGuestInfo(microblog.id).email.trim() ||
                                 commentLoading[microblog.id]
                               }
                               size="sm"
