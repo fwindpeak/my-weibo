@@ -3,11 +3,11 @@ import { db } from '@/lib/db'
 
 export async function POST(request: NextRequest) {
   try {
-    const { username, email, password } = await request.json()
+    const { username, password } = await request.json()
 
-    if (!username || !email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { message: '用户名、邮箱和密码不能为空' },
+        { message: '用户名和密码不能为空' },
         { status: 400 }
       )
     }
@@ -15,10 +15,8 @@ export async function POST(request: NextRequest) {
     // 查找管理员用户
     const user = await db.user.findFirst({
       where: {
-        OR: [
-          { username, isAdmin: true },
-          { email, isAdmin: true }
-        ]
+        username,
+        isAdmin: true
       }
     })
 

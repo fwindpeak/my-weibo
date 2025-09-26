@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { X, User, Mail, Lock, Shield } from 'lucide-react'
+import { X, User, Lock, Shield } from 'lucide-react'
 
 interface LoginModalProps {
   isOpen: boolean
@@ -16,17 +16,13 @@ interface LoginModalProps {
 
 interface LoginData {
   username: string
-  email: string
-  password?: string
-  isAdmin: boolean
+  password: string
 }
 
 export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps) {
   const [loginData, setLoginData] = useState<LoginData>({
     username: '',
-    email: '',
-    password: '',
-    isAdmin: true
+    password: ''
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -49,7 +45,10 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(loginData),
+        body: JSON.stringify({
+          username: loginData.username,
+          password: loginData.password
+        }),
       })
 
       if (response.ok) {
@@ -104,24 +103,6 @@ export default function LoginModal({ isOpen, onClose, onLogin }: LoginModalProps
                   onChange={(e) => handleInputChange('username', e.target.value)}
                   className="pl-10"
                   placeholder="请输入用户名"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">
-                邮箱
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  value={loginData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="pl-10"
-                  placeholder="请输入邮箱"
                   required
                 />
               </div>
