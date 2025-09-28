@@ -1,103 +1,773 @@
-import Image from "next/image";
+'use client'
+
+import { ChangeEvent, useEffect, useState } from 'react'
+import 'highlight.js/styles/github.css'
+import LoginModal from '@/components/auth/login-modal'
+import HomeHeader from './_components/home-header'
+import CreateMicroblogCard from './_components/create-microblog-card'
+import MicroblogList from './_components/microblog-list'
+import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
+import { MessageBox } from '@/components/ui/message-box'
+import { LogOut, Trash2 } from 'lucide-react'
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [content, setContent] = useState('')
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [microblogs, setMicroblogs] = useState<Microblog[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({})
+  const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
+  const [user, setUser] = useState<AppUser | null>(null)
+  const [loginModalState, setLoginModalState] = useState<{ open: boolean; mode: 'admin' | 'user' }>({
+    open: false,
+    mode: 'admin'
+  })
+  const [editingMicroblog, setEditingMicroblog] = useState<Record<string, boolean>>({})
+  const [editingContent, setEditingContent] = useState<Record<string, string>>({})
+  const [editingComments, setEditingComments] = useState<Record<string, boolean>>({})
+  const [editingCommentContent, setEditingCommentContent] = useState<Record<string, string>>({})
+  const [commentGuestInfo, setCommentGuestInfo] = useState<Record<string, GuestIdentity>>({})
+  const [guestIdentity, setGuestIdentity] = useState<GuestIdentity>({ name: '', email: '' })
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSearchBarVisible, setIsSearchBarVisible] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [microblogToDelete, setMicroblogToDelete] = useState<string | null>(null)
+  const [isDeletingMicroblog, setIsDeletingMicroblog] = useState(false)
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 120)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    handleScroll()
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchMicroblogs()
+  }, [])
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const response = await fetch('/api/auth/session', {
+          method: 'GET',
+          cache: 'no-store',
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setUser(data.user ?? null)
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        console.error('Failed to load session:', error)
+      }
+    }
+
+    loadSession()
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = localStorage.getItem('guestIdentity')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        setGuestIdentity({
+          name: parsed?.name || '',
+          email: parsed?.email || '',
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load guest identity:', error)
+    }
+  }, [])
+
+  const fetchMicroblogs = async (search?: string) => {
+    try {
+      setIsLoading(true)
+      const url = search ? `/api/microblogs?search=${encodeURIComponent(search)}` : '/api/microblogs'
+      const response = await fetch(url)
+      if (response.ok) {
+        const data = await response.json()
+        setMicroblogs(data)
+      }
+    } catch (error) {
+      console.error('Error fetching microblogs:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSearch = async (term: string) => {
+    setSearchTerm(term)
+    if (term.trim()) {
+      if (!isSearchBarVisible) {
+        setIsSearchBarVisible(true)
+      }
+      setIsSearching(true)
+      await fetchMicroblogs(term)
+    } else {
+      setIsSearching(false)
+      await fetchMicroblogs()
+    }
+  }
+
+  const clearSearch = async () => {
+    setSearchTerm('')
+    setIsSearching(false)
+    await fetchMicroblogs()
+  }
+
+  const openLoginModal = (mode: 'admin' | 'user') => {
+    setLoginModalState({ open: true, mode })
+  }
+
+  const closeLoginModal = () => {
+    setLoginModalState((prev) => ({ ...prev, open: false }))
+  }
+
+  const handleToggleSearchVisibility = () => {
+    setIsSearchBarVisible((prev) => {
+      const next = !prev
+      if (prev) {
+        clearSearch()
+      }
+      return next
+    })
+  }
+
+  const scrollToTop = () => {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || [])
+    setSelectedImages((prev) => [...prev, ...files])
+  }
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleSubmit = async () => {
+    if (!content.trim() && selectedImages.length === 0) return
+
+    if (!user || !user.isAdmin) {
+      openLoginModal('admin')
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const imageUrls = [] as { url: string; altText: string }[]
+      for (const file of selectedImages) {
+        const formData = new FormData()
+        formData.append('image', file)
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          imageUrls.push({
+            url: data.url,
+            altText: file.name,
+          })
+        }
+      }
+
+      const response = await fetch('/api/microblogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: content.trim(),
+          images: imageUrls,
+        }),
+      })
+
+      if (response.ok) {
+        const newMicroblog = await response.json()
+        setMicroblogs((prev) => [newMicroblog, ...prev])
+        setContent('')
+        setSelectedImages([])
+      } else {
+        console.error('Failed to create microblog')
+      }
+    } catch (error) {
+      console.error('Error submitting microblog:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleLike = async (microblogId: string) => {
+    if (!user) {
+      openLoginModal('user')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/microblogs/${microblogId}/like`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMicroblogs((prev) =>
+          prev.map((blog) => {
+            if (blog.id !== microblogId) {
+              return blog
+            }
+
+            const alreadyLiked = blog.likes.some((like) => like.userId === user.id)
+
+            if (data.liked === false || alreadyLiked) {
+              return {
+                ...blog,
+                likes: blog.likes.filter((like) => like.userId !== user.id),
+              }
+            }
+
+            return {
+              ...blog,
+              likes: [
+                ...blog.likes,
+                {
+                  id: data.like?.id || `${microblogId}-${user.id}`,
+                  userId: user.id,
+                },
+              ],
+            }
+          }),
+        )
+      }
+    } catch (error) {
+      console.error('Error liking microblog:', error)
+    }
+  }
+
+  const handleCommentInput = (microblogId: string, value: string) => {
+    setCommentInputs((prev) => ({
+      ...prev,
+      [microblogId]: value,
+    }))
+  }
+
+  const toggleComments = (microblogId: string) => {
+    setExpandedComments((prev) => ({
+      ...prev,
+      [microblogId]: !prev[microblogId],
+    }))
+    setCommentGuestInfo((prev) => {
+      if (prev[microblogId]) return prev
+      if (!guestIdentity.name && !guestIdentity.email) return prev
+      return {
+        ...prev,
+        [microblogId]: {
+          name: guestIdentity.name,
+          email: guestIdentity.email,
+        },
+      }
+    })
+  }
+
+  const handleSubmitComment = async (microblogId: string) => {
+    const commentContent = commentInputs[microblogId]
+    if (!commentContent || !commentContent.trim()) return
+
+    if (user) {
+      try {
+        setCommentLoading((prev) => ({ ...prev, [microblogId]: true }))
+
+        const response = await fetch(`/api/microblogs/${microblogId}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        body: JSON.stringify({
+          content: commentContent.trim(),
+        }),
+      })
+
+        if (response.ok) {
+          const newComment = await response.json()
+          setMicroblogs((prev) =>
+            prev.map((blog) =>
+              blog.id === microblogId
+                ? { ...blog, comments: [...blog.comments, newComment] }
+                : blog,
+            ),
+          )
+          setCommentInputs((prev) => ({
+            ...prev,
+            [microblogId]: '',
+          }))
+        } else {
+          console.error('Failed to create comment')
+        }
+      } catch (error) {
+        console.error('Error submitting comment:', error)
+      } finally {
+        setCommentLoading((prev) => ({ ...prev, [microblogId]: false }))
+      }
+    } else {
+      const guestInfo = commentGuestInfo[microblogId] || guestIdentity
+      if (!guestInfo?.name?.trim() || !guestInfo?.email?.trim()) {
+        alert('请填写用户名和邮箱')
+        return
+      }
+
+      try {
+        setCommentLoading((prev) => ({ ...prev, [microblogId]: true }))
+
+        const response = await fetch(`/api/microblogs/${microblogId}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            content: commentContent.trim(),
+            guestName: guestInfo.name.trim(),
+            guestEmail: guestInfo.email.trim(),
+          }),
+        })
+
+        if (response.ok) {
+          const newComment = await response.json()
+          setMicroblogs((prev) =>
+            prev.map((blog) =>
+              blog.id === microblogId
+                ? { ...blog, comments: [...blog.comments, newComment] }
+                : blog,
+            ),
+          )
+          setCommentInputs((prev) => ({
+            ...prev,
+            [microblogId]: '',
+          }))
+
+          const normalizedIdentity = {
+            name: guestInfo.name.trim(),
+            email: guestInfo.email.trim(),
+          }
+          setGuestIdentity(normalizedIdentity)
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('guestIdentity', JSON.stringify(normalizedIdentity))
+          }
+          setCommentGuestInfo((prev) => ({
+            ...prev,
+            [microblogId]: normalizedIdentity,
+          }))
+        } else {
+          console.error('Failed to create comment')
+        }
+      } catch (error) {
+        console.error('Error submitting comment:', error)
+      } finally {
+        setCommentLoading((prev) => ({ ...prev, [microblogId]: false }))
+      }
+    }
+  }
+
+  const handleLogin = (loggedInUser: AppUser) => {
+    setUser(loggedInUser)
+    closeLoginModal()
+  }
+
+  const requestLogout = () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+      })
+    } catch (error) {
+      console.error('Logout failed:', error)
+    } finally {
+      setUser(null)
+      setShowLogoutConfirm(false)
+    }
+  }
+
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false)
+  }
+
+  const startEditingMicroblog = (microblogId: string, currentContent: string) => {
+    setEditingMicroblog((prev) => ({ ...prev, [microblogId]: true }))
+    setEditingContent((prev) => ({ ...prev, [microblogId]: currentContent }))
+  }
+
+  const requestDeleteMicroblog = (microblogId: string) => {
+    if (!user) {
+      openLoginModal('user')
+      return
+    }
+
+    setMicroblogToDelete(microblogId)
+  }
+
+  const confirmDeleteMicroblog = async () => {
+    if (!user || !microblogToDelete) return
+
+    setIsDeletingMicroblog(true)
+
+    try {
+      const response = await fetch(`/api/microblogs/${microblogToDelete}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setMicroblogs((prev) => prev.filter((blog) => blog.id !== microblogToDelete))
+        setEditingMicroblog((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogToDelete]
+          return updated
+        })
+        setEditingContent((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogToDelete]
+          return updated
+        })
+      } else {
+        console.error('Failed to delete microblog')
+      }
+    } catch (error) {
+      console.error('Error deleting microblog:', error)
+    } finally {
+      setIsDeletingMicroblog(false)
+      setMicroblogToDelete(null)
+    }
+  }
+
+  const cancelDeleteMicroblog = () => {
+    if (isDeletingMicroblog) return
+    setMicroblogToDelete(null)
+  }
+
+  const cancelEditing = (microblogId: string) => {
+    setEditingMicroblog((prev) => ({ ...prev, [microblogId]: false }))
+    setEditingContent((prev) => ({ ...prev, [microblogId]: '' }))
+  }
+
+  const handleEditContentChange = (microblogId: string, value: string) => {
+    setEditingContent((prev) => ({ ...prev, [microblogId]: value }))
+  }
+
+  const saveEdit = async (microblogId: string) => {
+    try {
+      const response = await fetch(`/api/microblogs/${microblogId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: editingContent[microblogId],
+        }),
+      })
+
+      if (response.ok) {
+        const updatedMicroblog = await response.json()
+        setMicroblogs((prev) =>
+          prev.map((blog) => (blog.id === microblogId ? updatedMicroblog : blog)),
+        )
+        setEditingMicroblog((prev) => ({ ...prev, [microblogId]: false }))
+        setEditingContent((prev) => ({ ...prev, [microblogId]: '' }))
+      } else {
+        console.error('Failed to update microblog')
+      }
+    } catch (error) {
+      console.error('Error updating microblog:', error)
+    }
+  }
+
+  const startEditingComment = (
+    _microblogId: string,
+    commentId: string,
+    content: string,
+  ) => {
+    setEditingComments((prev) => ({ ...prev, [commentId]: true }))
+    setEditingCommentContent((prev) => ({ ...prev, [commentId]: content }))
+  }
+
+  const cancelEditingComment = (commentId: string) => {
+    setEditingComments((prev) => {
+      const updated = { ...prev }
+      delete updated[commentId]
+      return updated
+    })
+    setEditingCommentContent((prev) => {
+      const updated = { ...prev }
+      delete updated[commentId]
+      return updated
+    })
+  }
+
+  const handleEditCommentChange = (commentId: string, value: string) => {
+    setEditingCommentContent((prev) => ({ ...prev, [commentId]: value }))
+  }
+
+  const saveCommentEdit = async (microblogId: string, commentId: string) => {
+    if (!user) {
+      openLoginModal('user')
+      return
+    }
+
+    if (!editingCommentContent[commentId]?.trim()) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: editingCommentContent[commentId],
+        }),
+      })
+
+      if (response.ok) {
+        const updatedComment = await response.json()
+        setMicroblogs((prev) =>
+          prev.map((blog) =>
+            blog.id === microblogId
+              ? {
+                  ...blog,
+                  comments: blog.comments.map((comment) =>
+                    comment.id === commentId ? updatedComment : comment,
+                  ),
+                }
+              : blog,
+          ),
+        )
+        cancelEditingComment(commentId)
+      } else {
+        console.error('Failed to update comment')
+      }
+    } catch (error) {
+      console.error('Error updating comment:', error)
+    }
+  }
+
+  const deleteComment = async (microblogId: string, commentId: string) => {
+    if (!user) {
+      openLoginModal('user')
+      return
+    }
+
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('确认删除这条评论吗？')
+      if (!confirmed) return
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        setMicroblogs((prev) =>
+          prev.map((blog) =>
+            blog.id === microblogId
+              ? {
+                  ...blog,
+                  comments: blog.comments.filter((comment) => comment.id !== commentId),
+                }
+              : blog,
+          ),
+        )
+        cancelEditingComment(commentId)
+      } else {
+        console.error('Failed to delete comment')
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error)
+    }
+  }
+
+  const handleCommentGuestInfoChange = (
+    microblogId: string,
+    field: 'name' | 'email',
+    value: string,
+  ) => {
+    const updatedIdentity = {
+      ...guestIdentity,
+      [field]: value,
+    }
+
+    setGuestIdentity(updatedIdentity)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('guestIdentity', JSON.stringify(updatedIdentity))
+    }
+
+    setCommentGuestInfo((prev) => ({
+      ...prev,
+      [microblogId]: {
+        ...(prev[microblogId] || updatedIdentity),
+        [field]: value,
+      },
+    }))
+  }
+
+  const getGuestInfo = (microblogId: string) => commentGuestInfo[microblogId] ?? guestIdentity
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+    if (diff < 60) return '刚刚'
+    if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`
+    if (diff < 604800) return `${Math.floor(diff / 86400)} 天前`
+
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    const hour = date.getHours().toString().padStart(2, '0')
+    const minute = date.getMinutes().toString().padStart(2, '0')
+
+    if (year === now.getFullYear()) {
+      return `${month}月${day}日 ${hour}:${minute}`
+    }
+
+    return `${year}年${month}月${day}日 ${hour}:${minute}`
+  }
+
+  const formatFullTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    const hour = date.getHours().toString().padStart(2, '0')
+    const minute = date.getMinutes().toString().padStart(2, '0')
+    const second = date.getSeconds().toString().padStart(2, '0')
+
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
+      <HomeHeader
+        searchTerm={searchTerm}
+        isSearching={isSearching}
+        user={user}
+        isSearchVisible={isSearchBarVisible}
+        showScrollTop={showScrollTop}
+        onSearchChange={handleSearch}
+        onSearchClick={() => handleSearch(searchTerm)}
+        onToggleSearch={handleToggleSearchVisibility}
+        onClearSearch={clearSearch}
+        onScrollTop={scrollToTop}
+        onLoginClick={() => openLoginModal('admin')}
+        onLogoutClick={requestLogout}
+      />
+
+      <div className="container mx-auto max-w-2xl px-4 pb-14 pt-24 sm:px-6 sm:pb-16 sm:pt-28 lg:px-8">
+        {user && user.isAdmin && (
+          <CreateMicroblogCard
+            content={content}
+            showPreview={showPreview}
+            selectedImages={selectedImages}
+            isSubmitting={isSubmitting}
+            formatFullTime={formatFullTime}
+            onContentChange={setContent}
+            onTogglePreview={() => setShowPreview((prev) => !prev)}
+            onImageUpload={handleImageUpload}
+            onRemoveImage={removeImage}
+            onSubmit={handleSubmit}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        )}
+
+        <MicroblogList
+          microblogs={microblogs}
+          isLoading={isLoading}
+          isSearching={isSearching}
+          expandedComments={expandedComments}
+          commentInputs={commentInputs}
+          commentLoading={commentLoading}
+          editingMicroblog={editingMicroblog}
+          editingContent={editingContent}
+          editingComments={editingComments}
+          editingCommentContent={editingCommentContent}
+          user={user}
+          getGuestInfo={getGuestInfo}
+          formatTime={formatTime}
+          formatFullTime={formatFullTime}
+          onLike={handleLike}
+          onToggleComments={toggleComments}
+          onCommentInputChange={handleCommentInput}
+          onSubmitComment={handleSubmitComment}
+          onCommentGuestInfoChange={handleCommentGuestInfoChange}
+          onStartEditing={startEditingMicroblog}
+          onCancelEditing={cancelEditing}
+          onSaveEdit={saveEdit}
+          onEditContentChange={handleEditContentChange}
+          onDeleteMicroblog={requestDeleteMicroblog}
+          onStartEditComment={startEditingComment}
+          onCancelEditComment={cancelEditingComment}
+          onEditCommentChange={handleEditCommentChange}
+          onSaveEditComment={saveCommentEdit}
+          onDeleteComment={deleteComment}
+        />
+      </div>
+
+      <LoginModal
+        isOpen={loginModalState.open}
+        initialMode={loginModalState.mode}
+        onClose={closeLoginModal}
+        onLogin={handleLogin}
+      />
+
+      <MessageBox
+        open={showLogoutConfirm}
+        title="确认退出登录"
+        description="退出后将无法执行管理员操作，确定要继续吗？"
+        confirmText="退出登录"
+        cancelText="暂不退出"
+        icon={<LogOut className="h-6 w-6" />}
+        onConfirm={confirmLogout}
+        onCancel={cancelLogout}
+      />
+
+      <MessageBox
+        open={Boolean(microblogToDelete)}
+        title="删除微博"
+        description="删除后将无法恢复这条微博，确定要删除吗？"
+        confirmText="确认删除"
+        cancelText="保留微博"
+        variant="destructive"
+        loading={isDeletingMicroblog}
+        icon={<Trash2 className="h-6 w-6" />}
+        onConfirm={confirmDeleteMicroblog}
+        onCancel={cancelDeleteMicroblog}
+      />
     </div>
-  );
+  )
 }
