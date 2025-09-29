@@ -6,8 +6,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react'
-import MonacoEditorWrapper from '@/components/ui/monaco-editor-wrapper'
+import { Heart, MessageCircle, Edit3, Trash2, Loader2, TriangleAlert } from 'lucide-react'
 import LexicalEditor from '@/components/ui/lexical-editor'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -18,6 +17,10 @@ export interface EditableImage {
   url: string
   altText?: string | null
   file?: File
+  previewUrl?: string
+  uploading?: boolean
+  uploadError?: boolean
+  tempId?: string
 }
 
 interface MicroblogCardProps {
@@ -99,6 +102,10 @@ export default function MicroblogCard({
     altText: string | undefined | null,
     url: string,
   ) => {
+    if (!url) {
+      event.preventDefault()
+      return
+    }
     const markdown = `![${altText || '图片'}](${url})`
     event.dataTransfer.setData('text/plain', markdown)
     event.dataTransfer.effectAllowed = 'copy'
@@ -132,11 +139,11 @@ export default function MicroblogCard({
           )}
           {editing ? (
             <div className="space-y-3">
-              <MonacoEditorWrapper
+              <LexicalEditor
                 value={editingContent}
                 onChange={(value) => onEditContentChange(microblog.id, value)}
+                placeholder="编辑微博内容..."
                 height="120px"
-                language="markdown"
               />
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -167,15 +174,15 @@ export default function MicroblogCard({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {editingImages.map((image, index) => (
                       <div
-                        key={image.id ?? `${image.url}-${index}`}
+                        key={image.id ?? image.tempId ?? `${image.url}-${index}`}
                         className="relative group"
-                        draggable
+                        draggable={!image.uploading && !image.uploadError && Boolean(image.url)}
                         onDragStart={(event) =>
                           handleImageDragStart(event, image.altText, image.url)
                         }
                       >
                         <img
-                          src={image.url}
+                          src={image.url || image.previewUrl || ''}
                           alt={image.altText || `编辑图片 ${index + 1}`}
                           className="w-full h-24 object-cover rounded-lg border border-border/60"
                         />
@@ -187,10 +194,20 @@ export default function MicroblogCard({
                         >
                           ×
                         </button>
-                        {image.file && (
+                        {!image.id && !image.uploadError && (
                           <span className="absolute bottom-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
                             新
                           </span>
+                        )}
+                        {image.uploading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-primary">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </div>
+                        )}
+                        {image.uploadError && !image.uploading && (
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-destructive/90 text-destructive-foreground py-1 text-[10px] font-semibold">
+                            <TriangleAlert className="h-3 w-3" /> 上传失败
+                          </div>
                         )}
                       </div>
                     ))}
