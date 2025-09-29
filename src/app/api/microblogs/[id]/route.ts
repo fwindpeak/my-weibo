@@ -18,7 +18,7 @@ export async function PUT(
       )
     }
 
-    const { content } = await request.json()
+    const { content, newImages, deletedImageIds } = await request.json()
 
     if (!content || !content.trim()) {
       return NextResponse.json(
@@ -56,45 +56,71 @@ export async function PUT(
       )
     }
 
-    // 更新微博
-    const updatedMicroblog = await db.microblog.update({
-      where: { id },
-      data: {
-        content: content.trim(),
-        updatedAt: new Date()
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            isAdmin: true
+    const result = await db.$transaction(async (tx) => {
+      if (Array.isArray(deletedImageIds) && deletedImageIds.length > 0) {
+        await tx.image.deleteMany({
+          where: {
+            id: {
+              in: deletedImageIds
+            },
+            microblogId: id
           }
+        })
+      }
+
+      if (Array.isArray(newImages) && newImages.length > 0) {
+        await tx.image.createMany({
+          data: newImages.map((img: { url: string; altText?: string }) => ({
+            url: img.url,
+            altText: img.altText ?? null,
+            microblogId: id
+          }))
+        })
+      }
+
+      return tx.microblog.update({
+        where: { id },
+        data: {
+          content: content.trim(),
+          updatedAt: new Date()
         },
-        images: true,
-        likes: {
-          select: {
-            id: true,
-            userId: true,
-            createdAt: true
-          }
-        },
-        comments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                isAdmin: true
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              isAdmin: true
+            }
+          },
+          images: {
+            orderBy: {
+              createdAt: 'asc'
+            }
+          },
+          likes: {
+            select: {
+              id: true,
+              userId: true,
+              createdAt: true
+            }
+          },
+          comments: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  isAdmin: true
+                }
               }
             }
           }
         }
-      }
+      })
     })
 
-    return NextResponse.json(updatedMicroblog)
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Error updating microblog:', error)
     return NextResponse.json(

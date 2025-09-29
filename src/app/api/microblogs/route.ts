@@ -36,7 +36,11 @@ export async function GET(request: NextRequest) {
             isAdmin: true
           }
         },
-        images: true,
+        images: {
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
         likes: {
           select: {
             id: true,
@@ -119,7 +123,11 @@ export async function POST(request: NextRequest) {
             isAdmin: true
           }
         },
-        images: true,
+        images: {
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
         likes: {
           select: {
             id: true,

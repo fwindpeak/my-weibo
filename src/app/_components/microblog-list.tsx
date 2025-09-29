@@ -1,6 +1,6 @@
 'use client'
 
-import MicroblogCard from './microblog-card'
+import MicroblogCard, { EditableImage } from './microblog-card'
 import { Card, CardContent } from '@/components/ui/card'
 import { MessageCircle } from 'lucide-react'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
@@ -14,6 +14,7 @@ interface MicroblogListProps {
   commentLoading: Record<string, boolean>
   editingMicroblog: Record<string, boolean>
   editingContent: Record<string, string>
+  editingImages: Record<string, EditableImage[]>
   editingComments: Record<string, boolean>
   editingCommentContent: Record<string, string>
   user: AppUser | null
@@ -29,6 +30,8 @@ interface MicroblogListProps {
   onCancelEditing: (microblogId: string) => void
   onSaveEdit: (microblogId: string) => void
   onEditContentChange: (microblogId: string, value: string) => void
+  onEditImagesUpload: (microblogId: string, files: File[]) => void
+  onRemoveEditingImage: (microblogId: string, index: number) => void
   onDeleteMicroblog: (microblogId: string) => void
   onStartEditComment: (microblogId: string, commentId: string, content: string) => void
   onCancelEditComment: (commentId: string) => void
@@ -46,6 +49,7 @@ export default function MicroblogList({
   commentLoading,
   editingMicroblog,
   editingContent,
+  editingImages,
   editingComments,
   editingCommentContent,
   user,
@@ -61,6 +65,8 @@ export default function MicroblogList({
   onCancelEditing,
   onSaveEdit,
   onEditContentChange,
+  onEditImagesUpload,
+  onRemoveEditingImage,
   onDeleteMicroblog,
   onStartEditComment,
   onCancelEditComment,
@@ -106,6 +112,7 @@ export default function MicroblogList({
             commentLoading={Boolean(commentLoading[microblog.id])}
             editing={Boolean(editingMicroblog[microblog.id])}
             editingContent={editingContent[microblog.id] || ''}
+            editingImages={editingImages[microblog.id] || []}
             editingComments={editingComments}
             editingCommentContent={editingCommentContent}
             user={user}
@@ -121,6 +128,8 @@ export default function MicroblogList({
             onCancelEditing={onCancelEditing}
             onSaveEdit={onSaveEdit}
             onEditContentChange={onEditContentChange}
+            onEditImagesUpload={onEditImagesUpload}
+            onRemoveEditingImage={onRemoveEditingImage}
             onDeleteMicroblog={onDeleteMicroblog}
             onStartEditComment={onStartEditComment}
             onCancelEditComment={onCancelEditComment}
