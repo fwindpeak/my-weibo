@@ -6,8 +6,7 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react'
-import MonacoEditorWrapper from '@/components/ui/monaco-editor-wrapper'
+import { Heart, MessageCircle, Edit3, Trash2, Loader2, TriangleAlert } from 'lucide-react'
 import LexicalEditor from '@/components/ui/lexical-editor'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -18,6 +17,10 @@ export interface EditableImage {
   url: string
   altText?: string | null
   file?: File
+  previewUrl?: string
+  uploading?: boolean
+  uploadError?: boolean
+  tempId?: string
 }
 
 interface MicroblogCardProps {
@@ -93,12 +96,23 @@ export default function MicroblogCard({
   )
 
   const isLiked = Boolean(user && microblog.likes.some((like) => like.userId === user.id))
+  const canSaveMicroblogEdit = Boolean(editingContent?.trim())
+  const trimmedCommentInput = commentInput.trim()
+  const guestNameFilled = Boolean(guestInfo.name.trim())
+  const guestEmailFilled = Boolean(guestInfo.email.trim())
+  const canSubmitGuestComment =
+    Boolean(trimmedCommentInput) && guestNameFilled && guestEmailFilled && !commentLoading
+  const canSubmitUserComment = Boolean(trimmedCommentInput) && !commentLoading
 
   const handleImageDragStart = (
     event: React.DragEvent,
     altText: string | undefined | null,
     url: string,
   ) => {
+    if (!url) {
+      event.preventDefault()
+      return
+    }
     const markdown = `![${altText || '图片'}](${url})`
     event.dataTransfer.setData('text/plain', markdown)
     event.dataTransfer.effectAllowed = 'copy'
@@ -132,11 +146,16 @@ export default function MicroblogCard({
           )}
           {editing ? (
             <div className="space-y-3">
-              <MonacoEditorWrapper
+              <LexicalEditor
                 value={editingContent}
                 onChange={(value) => onEditContentChange(microblog.id, value)}
+                placeholder="编辑微博内容..."
                 height="120px"
-                language="markdown"
+                onSubmitShortcut={() => {
+                  if (canSaveMicroblogEdit) {
+                    onSaveEdit(microblog.id)
+                  }
+                }}
               />
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -167,15 +186,15 @@ export default function MicroblogCard({
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {editingImages.map((image, index) => (
                       <div
-                        key={image.id ?? `${image.url}-${index}`}
+                        key={image.id ?? image.tempId ?? `${image.url}-${index}`}
                         className="relative group"
-                        draggable
+                        draggable={!image.uploading && !image.uploadError && Boolean(image.url)}
                         onDragStart={(event) =>
                           handleImageDragStart(event, image.altText, image.url)
                         }
                       >
                         <img
-                          src={image.url}
+                          src={image.url || image.previewUrl || ''}
                           alt={image.altText || `编辑图片 ${index + 1}`}
                           className="w-full h-24 object-cover rounded-lg border border-border/60"
                         />
@@ -187,10 +206,20 @@ export default function MicroblogCard({
                         >
                           ×
                         </button>
-                        {image.file && (
+                        {!image.id && !image.uploadError && (
                           <span className="absolute bottom-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
                             新
                           </span>
+                        )}
+                        {image.uploading && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-primary">
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          </div>
+                        )}
+                        {image.uploadError && !image.uploading && (
+                          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-destructive/90 text-destructive-foreground py-1 text-[10px] font-semibold">
+                            <TriangleAlert className="h-3 w-3" /> 上传失败
+                          </div>
                         )}
                       </div>
                     ))}
@@ -214,7 +243,7 @@ export default function MicroblogCard({
                   size="sm"
                   onClick={() => onSaveEdit(microblog.id)}
                   className="text-xs"
-                  disabled={!editingContent?.trim()}
+                  disabled={!canSaveMicroblogEdit}
                 >
                   保存
                 </Button>
@@ -310,87 +339,97 @@ export default function MicroblogCard({
           <div className="mt-3 pt-3 border-t border-border animate-in slide-in-from-top-2 duration-300">
             {microblog.comments.length > 0 && (
               <div className="space-y-2.5 mb-3 max-h-60 overflow-y-auto custom-scrollbar">
-                {microblog.comments.map((comment) => (
-                  <div key={comment.id} className="bg-muted/30 px-3 py-2.5 rounded-lg text-sm space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex flex-col">
-                        {comment.user ? (
-                          <span className="font-medium text-xs text-foreground">{comment.user.username}</span>
-                        ) : (
-                          <span className="font-medium text-xs text-foreground">{comment.guestName}</span>
-                        )}
-                      </div>
-                      {(user?.isAdmin || (comment.user && user?.id === comment.user.id)) && (
-                        <div className="flex items-center gap-1">
-                          {!editingComments[comment.id] && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() =>
-                                  onStartEditComment(microblog.id, comment.id, comment.content)
-                                }
-                                aria-label="编辑评论"
-                              >
-                                <Edit3 className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive hover:text-destructive"
-                                onClick={() => onDeleteComment(microblog.id, comment.id)}
-                                aria-label="删除评论"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
+                {microblog.comments.map((comment) => {
+                  const commentValue = editingCommentContent[comment.id] || ''
+                  const canSaveCommentEdit = Boolean(commentValue.trim())
+
+                  return (
+                    <div key={comment.id} className="bg-muted/30 px-3 py-2.5 rounded-lg text-sm space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-col">
+                          {comment.user ? (
+                            <span className="font-medium text-xs text-foreground">{comment.user.username}</span>
+                          ) : (
+                            <span className="font-medium text-xs text-foreground">{comment.guestName}</span>
                           )}
                         </div>
-                      )}
-                    </div>
-                    {editingComments[comment.id] ? (
-                      <div className="space-y-2">
-                        <LexicalEditor
-                          value={editingCommentContent[comment.id] || ''}
-                          onChange={(value) => onEditCommentChange(comment.id, value)}
-                          placeholder="编辑评论..."
-                          height="80px"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 px-2 text-xs"
-                            onClick={() => onCancelEditComment(comment.id)}
-                          >
-                            取消
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="h-8 px-3 text-xs"
-                            disabled={!editingCommentContent[comment.id]?.trim()}
-                            onClick={() => onSaveEditComment(microblog.id, comment.id)}
-                          >
-                            保存
-                          </Button>
-                        </div>
+                        {(user?.isAdmin || (comment.user && user?.id === comment.user.id)) && (
+                          <div className="flex items-center gap-1">
+                            {!editingComments[comment.id] && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() =>
+                                    onStartEditComment(microblog.id, comment.id, comment.content)
+                                  }
+                                  aria-label="编辑评论"
+                                >
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => onDeleteComment(microblog.id, comment.id)}
+                                  aria-label="删除评论"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
-                        {comment.content}
+                      {editingComments[comment.id] ? (
+                        <div className="space-y-2">
+                          <LexicalEditor
+                            value={commentValue}
+                            onChange={(value) => onEditCommentChange(comment.id, value)}
+                            placeholder="编辑评论..."
+                            height="80px"
+                            onSubmitShortcut={() => {
+                              if (canSaveCommentEdit) {
+                                onSaveEditComment(microblog.id, comment.id)
+                              }
+                            }}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-xs"
+                              onClick={() => onCancelEditComment(comment.id)}
+                            >
+                              取消
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 px-3 text-xs"
+                              disabled={!canSaveCommentEdit}
+                              onClick={() => onSaveEditComment(microblog.id, comment.id)}
+                            >
+                              保存
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                          {comment.content}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        <span
+                          className="cursor-help hover:text-foreground transition-colors"
+                          title={`评论时间：${formatFullTime(comment.createdAt)}`}
+                        >
+                          {formatTime(comment.createdAt)}
+                        </span>
                       </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      <span
-                        className="cursor-help hover:text-foreground transition-colors"
-                        title={`评论时间：${formatFullTime(comment.createdAt)}`}
-                      >
-                        {formatTime(comment.createdAt)}
-                      </span>
-                    </p>
-                  </div>
-                ))}
+                    </div>
+                  )
+                })}
               </div>
             )}
 
@@ -419,16 +458,16 @@ export default function MicroblogCard({
                       onChange={(value) => onCommentInputChange(microblog.id, value)}
                       placeholder="写下你的评论..."
                       height="60px"
+                      onSubmitShortcut={() => {
+                        if (canSubmitGuestComment) {
+                          onSubmitComment(microblog.id)
+                        }
+                      }}
                     />
                   </div>
                   <Button
                     onClick={() => onSubmitComment(microblog.id)}
-                    disabled={
-                      !commentInput?.trim() ||
-                      !guestInfo.name.trim() ||
-                      !guestInfo.email.trim() ||
-                      commentLoading
-                    }
+                    disabled={!canSubmitGuestComment}
                     size="sm"
                     className="px-4 self-end"
                   >
@@ -448,11 +487,16 @@ export default function MicroblogCard({
                     onChange={(value) => onCommentInputChange(microblog.id, value)}
                     placeholder="写下你的评论..."
                     height="60px"
+                    onSubmitShortcut={() => {
+                      if (canSubmitUserComment) {
+                        onSubmitComment(microblog.id)
+                      }
+                    }}
                   />
                 </div>
                 <Button
                   onClick={() => onSubmitComment(microblog.id)}
-                  disabled={!commentInput?.trim() || commentLoading}
+                  disabled={!canSubmitUserComment}
                   size="sm"
                   className="px-4 self-end"
                 >

@@ -4,7 +4,7 @@ import { ChangeEvent, useEffect, useState } from 'react'
 import 'highlight.js/styles/github.css'
 import LoginModal from '@/components/auth/login-modal'
 import HomeHeader from './_components/home-header'
-import CreateMicroblogCard from './_components/create-microblog-card'
+import CreateMicroblogCard, { SelectedImageItem } from './_components/create-microblog-card'
 import MicroblogList from './_components/microblog-list'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 import type { EditableImage } from './_components/microblog-card'
@@ -13,7 +13,7 @@ import { LogOut, Trash2 } from 'lucide-react'
 
 export default function Home() {
   const [content, setContent] = useState('')
-  const [selectedImages, setSelectedImages] = useState<Array<{ file: File; url: string; alt: string }>>([])
+  const [selectedImages, setSelectedImages] = useState<SelectedImageItem[]>([])
   const [microblogs, setMicroblogs] = useState<Microblog[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
@@ -40,11 +40,36 @@ export default function Home() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [microblogToDelete, setMicroblogToDelete] = useState<string | null>(null)
   const [isDeletingMicroblog, setIsDeletingMicroblog] = useState(false)
+  const [shouldFocusSearch, setShouldFocusSearch] = useState(false)
+
+  const generateClientId = () => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  const uploadImageFile = async (file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error('Upload failed')
+    }
+
+    const data = await response.json()
+    return data.url as string
+  }
 
   const revokeEditingImageUrls = (images: EditableImage[]) => {
     images.forEach((image) => {
-      if (image.file) {
-        URL.revokeObjectURL(image.url)
+      if (image.previewUrl) {
+        URL.revokeObjectURL(image.previewUrl)
       }
     })
   }
@@ -67,6 +92,43 @@ export default function Home() {
   useEffect(() => {
     fetchMicroblogs()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setIsSearchBarVisible(true)
+        setShouldFocusSearch(true)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!shouldFocusSearch || !isSearchBarVisible || typeof window === 'undefined') {
+      return
+    }
+
+    const timer = window.setTimeout(() => {
+      const input = document.getElementById('home-search-input') as HTMLInputElement | null
+      if (input) {
+        input.focus()
+        input.select()
+      }
+      setShouldFocusSearch(false)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [isSearchBarVisible, shouldFocusSearch])
 
   useEffect(() => {
     const loadSession = async () => {
@@ -170,6 +232,9 @@ export default function Home() {
       }
       return next
     })
+    if (!isSearchBarVisible) {
+      setShouldFocusSearch(true)
+    }
   }
 
   const scrollToTop = () => {
@@ -179,19 +244,53 @@ export default function Home() {
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
-    const previews = files.map((file) => ({
+    if (!files.length) return
+
+    const additions = files.map((file) => ({
+      id: generateClientId(),
       file,
-      url: URL.createObjectURL(file),
-      alt: file.name
+      previewUrl: URL.createObjectURL(file),
+      remoteUrl: undefined,
+      alt: file.name,
+      uploading: true,
+      uploadError: false,
     }))
-    setSelectedImages((prev) => [...prev, ...previews])
+
+    setSelectedImages((prev) => [...prev, ...additions])
+
+    additions.forEach(async (item) => {
+      try {
+        const url = await uploadImageFile(item.file)
+        setSelectedImages((prev) =>
+          prev.map((image) =>
+            image.id === item.id
+              ? { ...image, remoteUrl: url, uploading: false, uploadError: false, file: undefined }
+              : image,
+          ),
+        )
+      } catch (error) {
+        console.error('Failed to upload image:', error)
+        setSelectedImages((prev) =>
+          prev.map((image) =>
+            image.id === item.id
+              ? { ...image, uploading: false, uploadError: true }
+              : image,
+          ),
+        )
+      }
+    })
+
+    event.target.value = ''
   }
 
   const removeImage = (index: number) => {
     setSelectedImages((prev) => {
       const target = prev[index]
-      if (target) {
-        URL.revokeObjectURL(target.url)
+      if (!target) {
+        return prev
+      }
+      if (target.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl)
       }
       return prev.filter((_, i) => i !== index)
     })
@@ -200,6 +299,11 @@ export default function Home() {
   const handleSubmit = async () => {
     if (!content.trim() && selectedImages.length === 0) return
 
+    if (selectedImages.some((image) => image.uploading)) {
+      console.warn('Images are still uploading')
+      return
+    }
+
     if (!user || !user.isAdmin) {
       openLoginModal('admin')
       return
@@ -207,26 +311,6 @@ export default function Home() {
 
     setIsSubmitting(true)
     try {
-      const imageUrls = [] as { url: string; altText: string }[]
-      for (const preview of selectedImages) {
-        const { file } = preview
-        const formData = new FormData()
-        formData.append('image', file)
-
-        const response = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          imageUrls.push({
-            url: data.url,
-            altText: file.name,
-          })
-        }
-      }
-
       const response = await fetch('/api/microblogs', {
         method: 'POST',
         headers: {
@@ -234,7 +318,12 @@ export default function Home() {
         },
         body: JSON.stringify({
           content: content.trim(),
-          images: imageUrls,
+          images: selectedImages
+            .filter((preview) => preview.remoteUrl && !preview.uploadError)
+            .map((preview) => ({
+              url: preview.remoteUrl as string,
+              altText: preview.alt,
+            })),
         }),
       })
 
@@ -242,7 +331,11 @@ export default function Home() {
         const newMicroblog = await response.json()
         setMicroblogs((prev) => [newMicroblog, ...prev])
         setContent('')
-        selectedImages.forEach((preview) => URL.revokeObjectURL(preview.url))
+        selectedImages.forEach((preview) => {
+          if (preview.previewUrl) {
+            URL.revokeObjectURL(preview.previewUrl)
+          }
+        })
         setSelectedImages([])
       } else {
         console.error('Failed to create microblog')
@@ -459,7 +552,9 @@ export default function Home() {
       [microblogId]: microblog?.images?.map((image) => ({
         id: image.id,
         url: image.url,
-        altText: image.altText ?? undefined
+        altText: image.altText ?? undefined,
+        uploading: false,
+        uploadError: false,
       })) || []
     }))
     setEditingImagesToDelete((prev) => ({ ...prev, [microblogId]: [] }))
@@ -551,16 +646,55 @@ export default function Home() {
   const handleEditImageUpload = (microblogId: string, files: File[]) => {
     if (!files.length) return
 
+    const additions: EditableImage[] = files.map((file) => ({
+      tempId: generateClientId(),
+      file,
+      url: '',
+      previewUrl: URL.createObjectURL(file),
+      altText: file.name,
+      uploading: true,
+      uploadError: false,
+    }))
+
     setEditingImages((prev) => {
       const current = prev[microblogId] || []
-      const additions = files.map((file) => ({
-        file,
-        url: URL.createObjectURL(file),
-        altText: file.name
-      }))
       return {
         ...prev,
-        [microblogId]: [...current, ...additions]
+        [microblogId]: [...current, ...additions],
+      }
+    })
+
+    additions.forEach(async (image) => {
+      try {
+        if (!image.file) return
+        const url = await uploadImageFile(image.file)
+        setEditingImages((prev) => {
+          const current = prev[microblogId] || []
+          return {
+            ...prev,
+            [microblogId]: current.map((item) =>
+              item.tempId && item.tempId === image.tempId
+                ? { ...item, url, uploading: false, uploadError: false, file: undefined }
+                : item,
+            ),
+          }
+        })
+        if (image.previewUrl) {
+          URL.revokeObjectURL(image.previewUrl)
+        }
+      } catch (error) {
+        console.error('Failed to upload image for editing', error)
+        setEditingImages((prev) => {
+          const current = prev[microblogId] || []
+          return {
+            ...prev,
+            [microblogId]: current.map((item) =>
+              item.tempId && item.tempId === image.tempId
+                ? { ...item, uploading: false, uploadError: true }
+                : item,
+            ),
+          }
+        })
       }
     })
   }
@@ -576,8 +710,8 @@ export default function Home() {
         return prev
       }
 
-      if (removedImage.file) {
-        URL.revokeObjectURL(removedImage.url)
+      if (removedImage.previewUrl) {
+        URL.revokeObjectURL(removedImage.previewUrl)
       }
 
       const updatedImages = current.filter((_, i) => i !== index)
@@ -612,32 +746,19 @@ export default function Home() {
 
     const currentImages = editingImages[microblogId] || []
     const imagesMarkedForDeletion = editingImagesToDelete[microblogId] || []
-    const newImageFiles = currentImages.filter((image) => image.file)
-    const uploadedImages: { url: string; altText?: string }[] = []
+    if (currentImages.some((image) => image.uploading)) {
+      console.warn('Images are still uploading')
+      return
+    }
+
+    const uploadedImages = currentImages
+      .filter((image) => !image.id && image.url && !image.uploadError)
+      .map((image) => ({
+        url: image.url,
+        altText: image.altText ?? undefined,
+      }))
 
     try {
-      for (const image of newImageFiles) {
-        if (!image.file) continue
-
-        const formData = new FormData()
-        formData.append('image', image.file)
-
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        })
-
-        if (uploadResponse.ok) {
-          const data = await uploadResponse.json()
-          uploadedImages.push({
-            url: data.url,
-            altText: image.file.name,
-          })
-        } else {
-          console.error('Failed to upload image for editing')
-        }
-      }
-
       const response = await fetch(`/api/microblogs/${microblogId}`, {
         method: 'PUT',
         headers: {
@@ -852,7 +973,6 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
       <HomeHeader
         searchTerm={searchTerm}
-        isSearching={isSearching}
         user={user}
         isSearchVisible={isSearchBarVisible}
         showScrollTop={showScrollTop}

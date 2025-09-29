@@ -89,7 +89,7 @@ export default function MonacoEditorWrapper({
   )
 
   if (!withContainer) {
-    return editor
+    return <div className={className}>{editor}</div>
   }
 
   return (
