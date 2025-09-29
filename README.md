@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# My Weibo
 
-## Getting Started
+A front-end and back-end separated microblogging demo. The Vite-powered React SPA lives in `frontend/`, and a Go HTTP API with a SQLite database powers the back-end under `backend/`.
 
-First, run the development server:
+## Project Layout
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+backend/   Go HTTP API (chi + GORM + SQLite)
+frontend/  React + TypeScript SPA built with Vite and Tailwind CSS
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The API exposes routes compatible with the original Next.js project (`/api/auth/*`, `/api/microblogs/*`, etc.) so the UI behaviour remains familiar.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Requirements
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Node.js 18+ (to build the SPA)
+- Go 1.24+
 
-## Learn More
+## Backend
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cd backend
+# download dependencies
+go mod tidy
+# start the API server
+go run .
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+If your environment blocks access to `proxy.golang.org`, rerun the install step with
+`GOPROXY=direct go mod tidy` or configure an alternative proxy.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Environment variables:
 
-## Deploy on Vercel
+| Variable         | Default                           | Description                                     |
+| ---------------- | --------------------------------- | ----------------------------------------------- |
+| `SERVER_ADDR`    | `:8080`                           | Address the API listens on                      |
+| `DATABASE_PATH`  | `backend/data/weibo.db`           | SQLite database path                            |
+| `UPLOAD_DIR`     | `backend/public/uploads`          | Directory to persist uploaded images            |
+| `ALLOWED_ORIGINS`| `http://localhost:5173`           | Comma separated list of allowed CORS origins    |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Uploaded files are served from `GET /uploads/{filename}`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Visit `http://localhost:5173` to access the SPA. Configure the API origin by setting `VITE_API_BASE_URL` in a `.env` file under `frontend/` when the backend runs on a different host.
+
+An example `.env` file covering the common backend and frontend variables is provided at the repository root as `.env.example`.
+
+## Available Scripts (frontend)
+
+- `npm run dev` – start the Vite development server.
+- `npm run build` – type-check and build the production bundle.
+- `npm run preview` – preview the production build locally.
+
+## Database
+
+The Go service automatically migrates the schema on startup. SQLite files live under `backend/data/`; delete the database file to reset the data.
+
+## Testing the API quickly
+
+```bash
+# With the backend running
+curl http://localhost:8080/api/health
+```
+
+## Notes
+
+- Sessions are implemented with HTTP-only cookies stored in the `sessions` table.
+- Uploaded images are validated for file type and size (max 5 MB).
+- Markdown content supports GitHub-flavored markdown and syntax highlighting.
