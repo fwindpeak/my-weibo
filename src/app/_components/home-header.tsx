@@ -1,27 +1,35 @@
-'use client'
+"use client";
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef } from "react";
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { AppUser } from '@/types/microblog'
-import { LogIn, LogOut, MessageCircle, Search, ShieldCheck, User2, X } from 'lucide-react'
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AppUser } from "@/types/microblog";
+import {
+  LogIn,
+  LogOut,
+  MessageCircle,
+  Search,
+  ShieldCheck,
+  User2,
+  X,
+} from "lucide-react";
 
 interface HomeHeaderProps {
-  searchTerm: string
-  isSearching: boolean
-  user: AppUser | null
-  isSearchVisible: boolean
-  showScrollTop: boolean
-  onSearchChange: (term: string) => void
-  onSearchClick: () => void
-  onToggleSearch: () => void
-  onClearSearch: () => void
-  onScrollTop: () => void
-  onLoginClick: () => void
-  onLogoutClick: () => void
+  searchTerm: string;
+  isSearching: boolean;
+  user: AppUser | null;
+  isSearchVisible: boolean;
+  showScrollTop: boolean;
+  onSearchChange: (term: string) => void;
+  onSearchClick: () => void;
+  onToggleSearch: () => void;
+  onClearSearch: () => void;
+  onScrollTop: () => void;
+  onLoginClick: () => void;
+  onLogoutClick: () => void;
 }
 
 export default function HomeHeader({
@@ -38,33 +46,36 @@ export default function HomeHeader({
   onLoginClick,
   onLogoutClick,
 }: HomeHeaderProps) {
-  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (isSearchVisible) {
       const timer = window.setTimeout(() => {
-        searchInputRef.current?.focus()
-      }, 0)
+        searchInputRef.current?.focus();
+      }, 0);
 
-      return () => window.clearTimeout(timer)
+      return () => window.clearTimeout(timer);
     }
-  }, [isSearchVisible])
+  }, [isSearchVisible]);
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-shadow ${showScrollTop ? 'shadow-sm cursor-pointer' : ''}`}
+      className={`fixed inset-x-0 top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-shadow ${showScrollTop ? "shadow-sm cursor-pointer" : ""}`}
       onClick={(event) => {
-        if (!showScrollTop) return
-        const target = event.target as HTMLElement
-        if (target.closest('[data-interactive="true"]')) return
-        onScrollTop()
+        if (!showScrollTop) return;
+        const target = event.target as HTMLElement;
+        if (target.closest('[data-interactive="true"]')) return;
+        onScrollTop();
       }}
     >
       <div className="container mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-2.5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center" data-interactive="true">
+              <div
+                className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center"
+                data-interactive="true"
+              >
                 <MessageCircle className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -72,7 +83,7 @@ export default function HomeHeader({
                   我的微博
                 </h1>
                 <p className="text-[11px] leading-4 text-muted-foreground">
-                 随时记录想法
+                  随时记录想法
                 </p>
               </div>
             </div>
@@ -80,7 +91,10 @@ export default function HomeHeader({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
             <div className="flex w-full items-center justify-end gap-2 sm:flex-1 sm:justify-end">
               {isSearchVisible ? (
-                <div className="flex w-full items-center gap-2 sm:w-auto" data-interactive="true">
+                <div
+                  className="flex w-full items-center gap-2 sm:w-auto"
+                  data-interactive="true"
+                >
                   <div className="relative flex-1 min-w-[160px]">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -90,10 +104,10 @@ export default function HomeHeader({
                       value={searchTerm}
                       onChange={(e) => onSearchChange(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          onSearchClick()
-                        } else if (e.key === 'Escape') {
-                          onToggleSearch()
+                        if (e.key === "Enter") {
+                          onSearchClick();
+                        } else if (e.key === "Escape") {
+                          onToggleSearch();
                         }
                       }}
                       className="h-9 rounded-full border-muted-foreground/20 bg-background/80 pl-10 pr-10 text-sm"
@@ -144,10 +158,15 @@ export default function HomeHeader({
                 </Button>
               )}
             </div>
-            <div className="flex items-center justify-between gap-2 sm:justify-end" data-interactive="true">
+            <div
+              className="flex items-center justify-between gap-2 sm:justify-end"
+              data-interactive="true"
+            >
               {user ? (
-                <LogOut className="cursor-pointer" onClick={onLogoutClick}>
-                </LogOut>
+                <LogOut
+                  className="cursor-pointer"
+                  onClick={onLogoutClick}
+                ></LogOut>
               ) : (
                 <Button
                   variant="outline"
@@ -165,6 +184,5 @@ export default function HomeHeader({
         </div>
       </div>
     </header>
-  )
+  );
 }
-

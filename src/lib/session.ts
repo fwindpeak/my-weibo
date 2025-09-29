@@ -20,7 +20,7 @@ export async function createSession(userId: string) {
     },
   })
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   cookieStore.set({
     name: SESSION_COOKIE_NAME,
     value: token,
@@ -33,7 +33,7 @@ export async function createSession(userId: string) {
 }
 
 export async function getSession() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
 
   if (!token) {
@@ -74,7 +74,7 @@ export async function getSessionUser() {
 }
 
 export async function clearSession() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
 
   if (token) {

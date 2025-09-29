@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Heart, MessageCircle, Edit3, Trash2 } from 'lucide-react'
 import MonacoEditorWrapper from '@/components/ui/monaco-editor-wrapper'
+import LexicalEditor from '@/components/ui/lexical-editor'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
@@ -73,19 +74,6 @@ export default function MicroblogCard({
 }: MicroblogCardProps) {
   const guestInfo = getGuestInfo(microblog.id)
   const [previewImage, setPreviewImage] = useState<{ url: string; altText: string } | null>(null)
-  const handleGuestKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      onSubmitComment(microblog.id)
-    }
-  }
-
-  const handleUserKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault()
-      onSubmitComment(microblog.id)
-    }
-  }
 
   const canManageMicroblog = Boolean(
     user?.isAdmin || (user && microblog.user && microblog.user.id === user.id),
@@ -169,7 +157,7 @@ export default function MicroblogCard({
               <button
                 key={image.id}
                 type="button"
-                onClick={() => setPreviewImage({ url: image.url, altText: image.altText })}
+                onClick={() => setPreviewImage({ url: image.url, altText: image.altText || '图片' })}
                 className={cn(
                   'relative group overflow-hidden rounded-lg focus:outline-none',
                   'focus-visible:ring-2 focus-visible:ring-primary/60',
@@ -266,11 +254,11 @@ export default function MicroblogCard({
                     </div>
                     {editingComments[comment.id] ? (
                       <div className="space-y-2">
-                        <textarea
-                          className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                          rows={3}
+                        <LexicalEditor
                           value={editingCommentContent[comment.id] || ''}
-                          onChange={(event) => onEditCommentChange(comment.id, event.target.value)}
+                          onChange={(value) => onEditCommentChange(comment.id, value)}
+                          placeholder="编辑评论..."
+                          height="80px"
                         />
                         <div className="flex justify-end gap-2">
                           <Button
@@ -328,14 +316,14 @@ export default function MicroblogCard({
                   />
                 </div>
                 <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="写下你的评论..."
-                    value={commentInput}
-                    onChange={(e) => onCommentInputChange(microblog.id, e.target.value)}
-                    className="flex-1 px-3 py-2 text-base border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                    onKeyPress={handleGuestKeyPress}
-                  />
+                  <div className="flex-1">
+                    <LexicalEditor
+                      value={commentInput}
+                      onChange={(value) => onCommentInputChange(microblog.id, value)}
+                      placeholder="写下你的评论..."
+                      height="60px"
+                    />
+                  </div>
                   <Button
                     onClick={() => onSubmitComment(microblog.id)}
                     disabled={
@@ -345,7 +333,7 @@ export default function MicroblogCard({
                       commentLoading
                     }
                     size="sm"
-                    className="px-4"
+                    className="px-4 self-end"
                   >
                     {commentLoading ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -357,19 +345,19 @@ export default function MicroblogCard({
               </div>
             ) : (
               <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  placeholder="写下你的评论..."
-                  value={commentInput}
-                  onChange={(e) => onCommentInputChange(microblog.id, e.target.value)}
-                  className="flex-1 px-3 py-2 text-base border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors"
-                  onKeyPress={handleUserKeyPress}
-                />
+                <div className="flex-1">
+                  <LexicalEditor
+                    value={commentInput}
+                    onChange={(value) => onCommentInputChange(microblog.id, value)}
+                    placeholder="写下你的评论..."
+                    height="60px"
+                  />
+                </div>
                 <Button
                   onClick={() => onSubmitComment(microblog.id)}
                   disabled={!commentInput?.trim() || commentLoading}
                   size="sm"
-                  className="px-4"
+                  className="px-4 self-end"
                 >
                   {commentLoading ? (
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
