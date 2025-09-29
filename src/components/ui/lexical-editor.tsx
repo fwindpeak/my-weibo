@@ -23,7 +23,7 @@ export default function LexicalEditor({
   placeholder = '开始输入...',
   readOnly = false,
   height = '200px',
-  enablePreviewToggle = false
+  enablePreviewToggle = true
 }: MarkdownEditorProps) {
   const [mode, setMode] = useState<'source' | 'preview'>(readOnly ? 'preview' : 'source')
   const [isFocused, setIsFocused] = useState(false)
@@ -50,9 +50,43 @@ export default function LexicalEditor({
   }, [showPreview])
 
   return (
-    <div className="relative border border-border rounded-lg overflow-hidden bg-background">
+    <div className="relative flex flex-col border border-border rounded-lg bg-background overflow-hidden">
+      <div className="relative flex-1">
+        {showPreview ? (
+          <div
+            className="relative min-h-[120px] overflow-y-auto bg-background p-4 text-base leading-relaxed text-foreground"
+            style={{ minHeight: height }}
+          >
+            {value?.trim() ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">预览区域，输入内容后将显示渲染效果...</p>
+            )}
+          </div>
+        ) : (
+          <div className="relative" style={{ minHeight: height }}>
+            {placeholderVisible && (
+              <div className="pointer-events-none absolute left-3 top-3 text-muted-foreground text-sm">
+                {placeholder}
+              </div>
+            )}
+            <MonacoEditorWrapper
+              value={value}
+              onChange={onChange}
+              height={height}
+              language="markdown"
+              withContainer={false}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+            />
+          </div>
+        )}
+      </div>
+
       {showToggle && (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-md border border-border bg-background/90 px-1.5 py-1 text-xs font-medium shadow-sm backdrop-blur">
+        <div className="flex items-center gap-1 border-t border-border bg-background/95 px-2.5 py-1.5 text-xs font-medium">
           <button
             type="button"
             onClick={() => setMode('source')}
@@ -81,41 +115,6 @@ export default function LexicalEditor({
             <Eye className="h-3.5 w-3.5" />
             预览
           </button>
-        </div>
-      )}
-
-      {showPreview ? (
-        <div
-          className={cn(
-            'relative min-h-[120px] overflow-y-auto rounded-lg bg-background p-4 text-base leading-relaxed text-foreground shadow-sm',
-            !readOnly && 'border border-border'
-          )}
-          style={{ minHeight: height }}
-        >
-          {value?.trim() ? (
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">预览区域，输入内容后将显示渲染效果...</p>
-          )}
-        </div>
-      ) : (
-        <div className="relative" style={{ minHeight: height }}>
-          {placeholderVisible && (
-            <div className="pointer-events-none absolute left-3 top-3 text-muted-foreground text-sm">
-              {placeholder}
-            </div>
-          )}
-          <MonacoEditorWrapper
-            value={value}
-            onChange={onChange}
-            height={height}
-            language="markdown"
-            withContainer={false}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-          />
         </div>
       )}
     </div>
