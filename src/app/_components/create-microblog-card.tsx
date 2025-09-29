@@ -5,11 +5,21 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import LexicalEditor from '@/components/ui/lexical-editor'
-import { Image as ImageIcon, Send } from 'lucide-react'
+import { Image as ImageIcon, Loader2, Send, TriangleAlert } from 'lucide-react'
+
+export interface SelectedImageItem {
+  id: string
+  file?: File
+  previewUrl: string
+  remoteUrl?: string
+  alt: string
+  uploading: boolean
+  uploadError?: boolean
+}
 
 interface CreateMicroblogCardProps {
   content: string
-  selectedImages: Array<{ file: File; url: string; alt: string }>
+  selectedImages: SelectedImageItem[]
   isSubmitting: boolean
   formatFullTime: (dateString: string) => string
   onContentChange: (value: string) => void
@@ -28,7 +38,8 @@ export default function CreateMicroblogCard({
   onRemoveImage,
   onSubmit,
 }: CreateMicroblogCardProps) {
-  const canSubmit = Boolean(content.trim() || selectedImages.length)
+  const hasPendingUploads = selectedImages.some((image) => image.uploading)
+  const canSubmit = Boolean(content.trim() || selectedImages.length) && !hasPendingUploads
 
   return (
     <Card className="mb-3 sm:mb-4 shadow-md border-primary/20 hover:shadow-lg transition-all duration-300">
@@ -81,19 +92,23 @@ export default function CreateMicroblogCard({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-muted/30 rounded-lg">
             {selectedImages.map((preview, index) => (
               <div
-                key={preview.url}
+                key={preview.id}
                 className="relative group"
-                draggable
+                draggable={!preview.uploading && !preview.uploadError}
                 onDragStart={(event) => {
+                  if (!preview.remoteUrl) {
+                    event.preventDefault()
+                    return
+                  }
                   event.dataTransfer.setData(
                     'text/plain',
-                    `![${preview.alt || '图片'}](${preview.url} "${preview.alt || ''}")`
+                    `![${preview.alt || '图片'}](${preview.remoteUrl} "${preview.alt || ''}")`
                   )
                   event.dataTransfer.effectAllowed = 'copy'
                 }}
               >
                 <img
-                  src={preview.url}
+                  src={preview.remoteUrl ?? preview.previewUrl}
                   alt={preview.alt || `预览 ${index + 1}`}
                   className="w-full h-20 sm:h-24 object-cover rounded-lg border-2 border-border group-hover:border-primary/40 transition-colors"
                 />
@@ -105,6 +120,16 @@ export default function CreateMicroblogCard({
                   ×
                 </button>
                 <div className="absolute inset-0 bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                {preview.uploading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 text-primary">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                )}
+                {preview.uploadError && !preview.uploading && (
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-destructive/90 text-destructive-foreground py-1 text-[10px] font-semibold">
+                    <TriangleAlert className="h-3 w-3" /> 上传失败
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -74,7 +74,10 @@ export default function LexicalEditor({
             )}
             <MonacoEditorWrapper
               value={value}
-              onChange={onChange}
+              onChange={(nextValue) => {
+                const sanitizedValue = nextValue?.replace(/\$0/g, '') ?? ''
+                onChange?.(sanitizedValue)
+              }}
               height={height}
               language="markdown"
               withContainer={false}
