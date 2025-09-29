@@ -22,11 +22,24 @@ export function LexicalMarkdownEditor({
   useEffect(() => {
     if (!editor) return
 
+    // 如果外部传入的内容和当前编辑器内容一致，就无需再次更新，避免打断输入法
+    let shouldUpdate = false
+
+    editor.getEditorState().read(() => {
+      const root = $getRoot()
+      const currentText = root.getTextContent()
+      if ((value || '') !== currentText) {
+        shouldUpdate = true
+      }
+    })
+
+    if (!shouldUpdate) return
+
     // 更新编辑器内容
     editor.update(() => {
       const root = $getRoot()
       root.clear()
-      
+
       if (value) {
         const paragraph = $createParagraphNode()
         paragraph.append($createTextNode(value))
