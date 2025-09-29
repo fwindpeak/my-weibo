@@ -7,6 +7,7 @@ import HomeHeader from './_components/home-header'
 import CreateMicroblogCard from './_components/create-microblog-card'
 import MicroblogList from './_components/microblog-list'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
+import type { EditableImage } from './_components/microblog-card'
 import { MessageBox } from '@/components/ui/message-box'
 import { LogOut, Trash2 } from 'lucide-react'
 
@@ -26,6 +27,8 @@ export default function Home() {
   })
   const [editingMicroblog, setEditingMicroblog] = useState<Record<string, boolean>>({})
   const [editingContent, setEditingContent] = useState<Record<string, string>>({})
+  const [editingImages, setEditingImages] = useState<Record<string, EditableImage[]>>({})
+  const [editingImagesToDelete, setEditingImagesToDelete] = useState<Record<string, string[]>>({})
   const [editingComments, setEditingComments] = useState<Record<string, boolean>>({})
   const [editingCommentContent, setEditingCommentContent] = useState<Record<string, string>>({})
   const [commentGuestInfo, setCommentGuestInfo] = useState<Record<string, GuestIdentity>>({})
@@ -37,6 +40,14 @@ export default function Home() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [microblogToDelete, setMicroblogToDelete] = useState<string | null>(null)
   const [isDeletingMicroblog, setIsDeletingMicroblog] = useState(false)
+
+  const revokeEditingImageUrls = (images: EditableImage[]) => {
+    images.forEach((image) => {
+      if (image.file) {
+        URL.revokeObjectURL(image.url)
+      }
+    })
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -416,6 +427,17 @@ export default function Home() {
   const startEditingMicroblog = (microblogId: string, currentContent: string) => {
     setEditingMicroblog((prev) => ({ ...prev, [microblogId]: true }))
     setEditingContent((prev) => ({ ...prev, [microblogId]: currentContent }))
+
+    const microblog = microblogs.find((item) => item.id === microblogId)
+    setEditingImages((prev) => ({
+      ...prev,
+      [microblogId]: microblog?.images?.map((image) => ({
+        id: image.id,
+        url: image.url,
+        altText: image.altText ?? undefined
+      })) || []
+    }))
+    setEditingImagesToDelete((prev) => ({ ...prev, [microblogId]: [] }))
   }
 
   const requestDeleteMicroblog = (microblogId: string) => {
@@ -449,6 +471,20 @@ export default function Home() {
           delete updated[microblogToDelete]
           return updated
         })
+        setEditingImages((prev) => {
+          const updated = { ...prev }
+          const images = updated[microblogToDelete]
+          if (images) {
+            revokeEditingImageUrls(images)
+            delete updated[microblogToDelete]
+          }
+          return updated
+        })
+        setEditingImagesToDelete((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogToDelete]
+          return updated
+        })
       } else {
         console.error('Failed to delete microblog')
       }
@@ -468,21 +504,124 @@ export default function Home() {
   const cancelEditing = (microblogId: string) => {
     setEditingMicroblog((prev) => ({ ...prev, [microblogId]: false }))
     setEditingContent((prev) => ({ ...prev, [microblogId]: '' }))
+    if (editingImages[microblogId]) {
+      revokeEditingImageUrls(editingImages[microblogId])
+    }
+    setEditingImages((prev) => {
+      const updated = { ...prev }
+      delete updated[microblogId]
+      return updated
+    })
+    setEditingImagesToDelete((prev) => {
+      const updated = { ...prev }
+      delete updated[microblogId]
+      return updated
+    })
   }
 
   const handleEditContentChange = (microblogId: string, value: string) => {
     setEditingContent((prev) => ({ ...prev, [microblogId]: value }))
   }
 
+  const handleEditImageUpload = (microblogId: string, files: File[]) => {
+    if (!files.length) return
+
+    setEditingImages((prev) => {
+      const current = prev[microblogId] || []
+      const additions = files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+        altText: file.name
+      }))
+      return {
+        ...prev,
+        [microblogId]: [...current, ...additions]
+      }
+    })
+  }
+
+  const handleRemoveEditingImage = (microblogId: string, index: number) => {
+    let removedImage: EditableImage | undefined
+
+    setEditingImages((prev) => {
+      const current = prev[microblogId] || []
+      removedImage = current[index]
+
+      if (!removedImage) {
+        return prev
+      }
+
+      if (removedImage.file) {
+        URL.revokeObjectURL(removedImage.url)
+      }
+
+      const updatedImages = current.filter((_, i) => i !== index)
+
+      return {
+        ...prev,
+        [microblogId]: updatedImages
+      }
+    })
+
+    if (removedImage?.id) {
+      setEditingImagesToDelete((prev) => {
+        const existing = prev[microblogId] || []
+        if (existing.includes(removedImage!.id!)) {
+          return prev
+        }
+        return {
+          ...prev,
+          [microblogId]: [...existing, removedImage!.id!]
+        }
+      })
+    }
+  }
+
   const saveEdit = async (microblogId: string) => {
+    const contentToSave = editingContent[microblogId]?.trim()
+
+    if (!contentToSave) {
+      console.error('Content is required')
+      return
+    }
+
+    const currentImages = editingImages[microblogId] || []
+    const imagesMarkedForDeletion = editingImagesToDelete[microblogId] || []
+    const newImageFiles = currentImages.filter((image) => image.file)
+    const uploadedImages: { url: string; altText?: string }[] = []
+
     try {
+      for (const image of newImageFiles) {
+        if (!image.file) continue
+
+        const formData = new FormData()
+        formData.append('image', image.file)
+
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (uploadResponse.ok) {
+          const data = await uploadResponse.json()
+          uploadedImages.push({
+            url: data.url,
+            altText: image.file.name,
+          })
+        } else {
+          console.error('Failed to upload image for editing')
+        }
+      }
+
       const response = await fetch(`/api/microblogs/${microblogId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: editingContent[microblogId],
+          content: contentToSave,
+          newImages: uploadedImages,
+          deletedImageIds: Array.from(new Set(imagesMarkedForDeletion)),
         }),
       })
 
@@ -491,8 +630,21 @@ export default function Home() {
         setMicroblogs((prev) =>
           prev.map((blog) => (blog.id === microblogId ? updatedMicroblog : blog)),
         )
+        if (currentImages.length > 0) {
+          revokeEditingImageUrls(currentImages)
+        }
         setEditingMicroblog((prev) => ({ ...prev, [microblogId]: false }))
         setEditingContent((prev) => ({ ...prev, [microblogId]: '' }))
+        setEditingImages((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogId]
+          return updated
+        })
+        setEditingImagesToDelete((prev) => {
+          const updated = { ...prev }
+          delete updated[microblogId]
+          return updated
+        })
       } else {
         console.error('Failed to update microblog')
       }
@@ -711,6 +863,7 @@ export default function Home() {
           commentLoading={commentLoading}
           editingMicroblog={editingMicroblog}
           editingContent={editingContent}
+          editingImages={editingImages}
           editingComments={editingComments}
           editingCommentContent={editingCommentContent}
           user={user}
@@ -726,6 +879,8 @@ export default function Home() {
           onCancelEditing={cancelEditing}
           onSaveEdit={saveEdit}
           onEditContentChange={handleEditContentChange}
+          onEditImagesUpload={handleEditImageUpload}
+          onRemoveEditingImage={handleRemoveEditingImage}
           onDeleteMicroblog={requestDeleteMicroblog}
           onStartEditComment={startEditingComment}
           onCancelEditComment={cancelEditingComment}

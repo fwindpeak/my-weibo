@@ -13,6 +13,13 @@ import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 
+export interface EditableImage {
+  id?: string
+  url: string
+  altText?: string | null
+  file?: File
+}
+
 interface MicroblogCardProps {
   microblog: Microblog
   isExpanded: boolean
@@ -20,6 +27,7 @@ interface MicroblogCardProps {
   commentLoading: boolean
   editing: boolean
   editingContent: string
+  editingImages?: EditableImage[]
   editingComments: Record<string, boolean>
   editingCommentContent: Record<string, string>
   user: AppUser | null
@@ -35,6 +43,8 @@ interface MicroblogCardProps {
   onCancelEditing: (microblogId: string) => void
   onSaveEdit: (microblogId: string) => void
   onEditContentChange: (microblogId: string, value: string) => void
+  onEditImagesUpload: (microblogId: string, files: File[]) => void
+  onRemoveEditingImage: (microblogId: string, index: number) => void
   onDeleteMicroblog: (microblogId: string) => void
   onStartEditComment: (microblogId: string, commentId: string, content: string) => void
   onCancelEditComment: (commentId: string) => void
@@ -50,6 +60,7 @@ export default function MicroblogCard({
   commentLoading,
   editing,
   editingContent,
+  editingImages = [],
   editingComments,
   editingCommentContent,
   user,
@@ -65,6 +76,8 @@ export default function MicroblogCard({
   onCancelEditing,
   onSaveEdit,
   onEditContentChange,
+  onEditImagesUpload,
+  onRemoveEditingImage,
   onDeleteMicroblog,
   onStartEditComment,
   onCancelEditComment,
@@ -115,6 +128,62 @@ export default function MicroblogCard({
                 height="120px"
                 language="markdown"
               />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">图片</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`edit-image-upload-${microblog.id}`}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => {
+                        const files = event.target.files
+                        if (files && files.length > 0) {
+                          onEditImagesUpload(microblog.id, Array.from(files))
+                          event.target.value = ''
+                        }
+                      }}
+                    />
+                    <label htmlFor={`edit-image-upload-${microblog.id}`}>
+                      <Button variant="outline" size="sm" asChild className="h-8 text-xs">
+                        <span className="cursor-pointer">添加图片</span>
+                      </Button>
+                    </label>
+                  </div>
+                </div>
+                {editingImages.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {editingImages.map((image, index) => (
+                      <div key={image.id ?? `${image.url}-${index}`} className="relative group">
+                        <img
+                          src={image.url}
+                          alt={image.altText || `编辑图片 ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border border-border/60"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => onRemoveEditingImage(microblog.id, index)}
+                          className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs shadow-sm hover:bg-destructive/90"
+                          aria-label="删除图片"
+                        >
+                          ×
+                        </button>
+                        {image.file && (
+                          <span className="absolute bottom-1 left-1 rounded bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm">
+                            新
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border/70 bg-muted/20 p-3 text-center text-xs text-muted-foreground">
+                    暂无图片，点击右上角添加
+                  </div>
+                )}
+              </div>
               <div className="flex justify-end gap-2">
                 <Button
                   variant="outline"
