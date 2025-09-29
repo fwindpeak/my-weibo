@@ -39,7 +39,6 @@ export default function CreateMicroblogCard({
             onChange={onContentChange}
             placeholder="分享你的想法..."
             height="120px"
-            enablePreviewToggle
           />
 
           <div className="flex items-center justify-between">
