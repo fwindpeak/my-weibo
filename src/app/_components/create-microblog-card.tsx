@@ -9,7 +9,7 @@ import { Image as ImageIcon, Send } from 'lucide-react'
 
 interface CreateMicroblogCardProps {
   content: string
-  selectedImages: File[]
+  selectedImages: Array<{ file: File; url: string; alt: string }>
   isSubmitting: boolean
   formatFullTime: (dateString: string) => string
   onContentChange: (value: string) => void
@@ -79,16 +79,28 @@ export default function CreateMicroblogCard({
 
         {selectedImages.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 bg-muted/30 rounded-lg">
-            {selectedImages.map((file, index) => (
-              <div key={index} className="relative group">
+            {selectedImages.map((preview, index) => (
+              <div
+                key={preview.url}
+                className="relative group"
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.setData(
+                    'text/plain',
+                    `![${preview.alt || '图片'}](${preview.url} "${preview.alt || ''}")`
+                  )
+                  event.dataTransfer.effectAllowed = 'copy'
+                }}
+              >
                 <img
-                  src={URL.createObjectURL(file)}
-                  alt={`预览 ${index + 1}`}
+                  src={preview.url}
+                  alt={preview.alt || `预览 ${index + 1}`}
                   className="w-full h-20 sm:h-24 object-cover rounded-lg border-2 border-border group-hover:border-primary/40 transition-colors"
                 />
                 <button
                   onClick={() => onRemoveImage(index)}
                   className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-destructive/90 transition-colors opacity-0 group-hover:opacity-100"
+                  type="button"
                 >
                   ×
                 </button>

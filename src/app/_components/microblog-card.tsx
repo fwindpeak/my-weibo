@@ -94,6 +94,16 @@ export default function MicroblogCard({
 
   const isLiked = Boolean(user && microblog.likes.some((like) => like.userId === user.id))
 
+  const handleImageDragStart = (
+    event: React.DragEvent,
+    altText: string | undefined | null,
+    url: string,
+  ) => {
+    const markdown = `![${altText || '图片'}](${url})`
+    event.dataTransfer.setData('text/plain', markdown)
+    event.dataTransfer.effectAllowed = 'copy'
+  }
+
   return (
     <Card className="hover:shadow-md transition-all duration-300 border-primary/10 hover:border-primary/20 bg-gradient-to-br from-background to-muted/5">
       <CardContent className="px-4 py-3 sm:px-5 sm:py-4">
@@ -156,7 +166,14 @@ export default function MicroblogCard({
                 {editingImages.length > 0 ? (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {editingImages.map((image, index) => (
-                      <div key={image.id ?? `${image.url}-${index}`} className="relative group">
+                      <div
+                        key={image.id ?? `${image.url}-${index}`}
+                        className="relative group"
+                        draggable
+                        onDragStart={(event) =>
+                          handleImageDragStart(event, image.altText, image.url)
+                        }
+                      >
                         <img
                           src={image.url}
                           alt={image.altText || `编辑图片 ${index + 1}`}
@@ -213,46 +230,56 @@ export default function MicroblogCard({
         </div>
 
         {microblog.images.length > 0 && (
-          <div
-            className={`grid gap-1.5 mb-2.5 ${
-              microblog.images.length === 1
-                ? 'grid-cols-1'
-                : microblog.images.length === 2
-                ? 'grid-cols-2'
-                : 'grid-cols-2 sm:grid-cols-3'
-            }`}
-          >
-            {microblog.images.map((image) => (
-              <button
-                key={image.id}
-                type="button"
-                onClick={() => setPreviewImage({ url: image.url, altText: image.altText || '图片' })}
-                className={cn(
-                  'relative group overflow-hidden rounded-lg focus:outline-none',
-                  'focus-visible:ring-2 focus-visible:ring-primary/60',
-                )}
-                aria-label="查看大图"
+          <div className="mb-2.5 overflow-hidden rounded-lg border border-border/60 bg-muted/10">
+            <details>
+              <summary className="list-none cursor-pointer select-none px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                {`图片 (${microblog.images.length})`}
+              </summary>
+              <div
+                className={`grid gap-1.5 p-3 border-t border-border/40 ${microblog.images.length === 1
+                  ? 'grid-cols-1'
+                  : microblog.images.length === 2
+                    ? 'grid-cols-2'
+                    : 'grid-cols-2 sm:grid-cols-3'
+                  }`}
               >
-                <img
-                  src={image.url}
-                  alt={image.altText}
-                  className="w-full h-40 sm:h-48 object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-medium text-white transition-all duration-300 group-hover:bg-black/40 group-hover:text-white">
-                  <span className="opacity-0 group-hover:opacity-100">点击查看大图</span>
-                </div>
-              </button>
-            ))}
+                {microblog.images.map((image) => (
+                  <button
+                    key={image.id}
+                    type="button"
+                    draggable
+                    onClick={() =>
+                      setPreviewImage({ url: image.url, altText: image.altText || '图片' })
+                    }
+                    onDragStart={(event) => handleImageDragStart(event, image.altText, image.url)}
+                    className={cn(
+                      'relative group overflow-hidden rounded-lg focus:outline-none',
+                      'focus-visible:ring-2 focus-visible:ring-primary/60',
+                    )}
+                    aria-label="查看大图"
+                  >
+                    <img
+                      src={image.url}
+                      alt={image.altText}
+                      className="w-full h-40 sm:h-48 object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 text-xs font-medium text-white transition-all duration-300 group-hover:bg-black/40 group-hover:text-white">
+                      <span className="opacity-0 group-hover:opacity-100">点击查看大图</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </details>
           </div>
         )}
 
         <div className="flex items-center justify-between text-base text-muted-foreground pt-2.5 border-t border-border/50">
           <div className="flex items-center gap-4">
             <button
+              type="button"
               onClick={() => onLike(microblog.id)}
-              className={`flex items-center gap-1 transition-colors group ${
-                isLiked ? 'text-red-500' : 'hover:text-red-500'
-              }`}
+              className={`flex items-center gap-1 transition-colors group ${isLiked ? 'text-red-500' : 'hover:text-red-500'
+                }`}
               title="点赞"
             >
               <Heart
@@ -262,6 +289,7 @@ export default function MicroblogCard({
               {microblog.likes.length > 0 && <span className="text-xs font-medium">{microblog.likes.length}</span>}
             </button>
             <button
+              type="button"
               onClick={() => onToggleComments(microblog.id)}
               className="flex items-center gap-1 hover:text-blue-500 transition-colors group"
               title="评论"
