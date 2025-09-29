@@ -932,7 +932,6 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
       <HomeHeader
         searchTerm={searchTerm}
-        isSearching={isSearching}
         user={user}
         isSearchVisible={isSearchBarVisible}
         showScrollTop={showScrollTop}
