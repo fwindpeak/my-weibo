@@ -1,64 +1,12 @@
 'use client'
 
-import { LexicalComposer } from '@lexical/react/LexicalComposer'
-import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
-import { ContentEditable } from '@lexical/react/LexicalContentEditable'
-import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
-import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin'
-import { LinkPlugin } from '@lexical/react/LexicalLinkPlugin'
-import { ListPlugin } from '@lexical/react/LexicalListPlugin'
-import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPlugin'
-import { TRANSFORMERS } from '@lexical/markdown'
-import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { TableCellNode, TableNode, TableRowNode } from '@lexical/table'
-import { ListItemNode, ListNode } from '@lexical/list'
-import { CodeNode } from '@lexical/code'
-import { AutoLinkNode, LinkNode } from '@lexical/link'
-import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary'
-import { LexicalMarkdownEditor } from './lexical-markdown-editor'
-
-const editorConfig = {
-  namespace: 'MicroblogEditor',
-  nodes: [
-    HeadingNode,
-    ListNode,
-    ListItemNode,
-    QuoteNode,
-    CodeNode,
-    TableNode,
-    TableCellNode,
-    TableRowNode,
-    AutoLinkNode,
-    LinkNode,
-  ],
-  onError(error: Error) {
-    console.error(error)
-  },
-  theme: {
-    text: {
-      bold: 'font-bold',
-      italic: 'italic',
-      underline: 'underline',
-      strikethrough: 'line-through',
-    },
-    heading: {
-      h1: 'text-2xl font-bold mt-6 mb-4',
-      h2: 'text-xl font-bold mt-5 mb-3',
-      h3: 'text-lg font-bold mt-4 mb-2',
-    },
-    list: {
-      nested: {
-        listitem: 'list-none',
-      },
-      ol: 'list-decimal pl-6',
-      ul: 'list-disc pl-6',
-      listitem: 'my-1',
-    },
-    quote: 'border-l-4 border-gray-300 pl-4 italic my-4',
-    code: 'bg-gray-100 dark:bg-gray-800 rounded px-1 py-0.5 font-mono text-sm',
-    link: 'text-blue-600 dark:text-blue-400 underline',
-  },
-}
+import { useEffect, useState } from 'react'
+import { Eye, Code2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import MonacoEditorWrapper from './monaco-editor-wrapper'
+import { cn } from '@/lib/utils'
 
 interface LexicalEditorProps {
   value: string
@@ -66,6 +14,7 @@ interface LexicalEditorProps {
   placeholder?: string
   readOnly?: boolean
   height?: string
+  enablePreviewToggle?: boolean
 }
 
 export default function LexicalEditor({
@@ -74,42 +23,101 @@ export default function LexicalEditor({
   placeholder = '开始输入...',
   readOnly = false,
   height = '200px',
+  enablePreviewToggle = false
 }: LexicalEditorProps) {
-  const initialConfig = {
-    ...editorConfig,
-    editable: !readOnly,
-  }
+  const [mode, setMode] = useState<'source' | 'preview'>(readOnly ? 'preview' : 'source')
+  const [isFocused, setIsFocused] = useState(false)
+
+  const showPreview = readOnly || (enablePreviewToggle && mode === 'preview')
+  const showToggle = enablePreviewToggle && !readOnly
+  const placeholderVisible = !showPreview && !value && !isFocused
+
+  useEffect(() => {
+    if (readOnly) {
+      setMode('preview')
+      return
+    }
+
+    if (!enablePreviewToggle) {
+      setMode('source')
+    }
+  }, [readOnly, enablePreviewToggle])
+
+  useEffect(() => {
+    if (showPreview) {
+      setIsFocused(false)
+    }
+  }, [showPreview])
 
   return (
     <div className="relative border border-border rounded-lg overflow-hidden bg-background">
-      <LexicalComposer initialConfig={initialConfig}>
-        <div className="relative">
-          <RichTextPlugin
-            contentEditable={
-              <ContentEditable
-                className="min-h-[120px] p-3 outline-none resize-none font-mono text-base"
-                style={{ height }}
-              />
-            }
-            placeholder={
-              <div className="absolute top-3 left-3 text-muted-foreground pointer-events-none">
-                {placeholder}
-              </div>
-            }
-            ErrorBoundary={LexicalErrorBoundary}
-          />
-          {!readOnly && (
-            <>
-              <HistoryPlugin />
-              <AutoFocusPlugin />
-              <LinkPlugin />
-              <ListPlugin />
-              <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-            </>
-          )}
-          <LexicalMarkdownEditor value={value} onChange={onChange} readOnly={readOnly} />
+      {showToggle && (
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 rounded-md border border-border bg-background/90 px-1.5 py-1 text-xs font-medium shadow-sm backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setMode('source')}
+            className={cn(
+              'flex items-center gap-1 rounded-sm px-2 py-1 transition-colors',
+              mode === 'source'
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            aria-pressed={mode === 'source'}
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            源码
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('preview')}
+            className={cn(
+              'flex items-center gap-1 rounded-sm px-2 py-1 transition-colors',
+              mode === 'preview'
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+            aria-pressed={mode === 'preview'}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            预览
+          </button>
         </div>
-      </LexicalComposer>
+      )}
+
+      {showPreview ? (
+        <div
+          className={cn(
+            'relative min-h-[120px] overflow-y-auto bg-muted/20 p-3 text-sm leading-relaxed text-foreground prose prose-sm max-w-none dark:prose-invert',
+            !readOnly && 'border-t border-border/50'
+          )}
+          style={{ minHeight: height }}
+        >
+          {value?.trim() ? (
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+              {value}
+            </ReactMarkdown>
+          ) : (
+            <p className="text-muted-foreground">预览区域，输入内容后将显示渲染效果...</p>
+          )}
+        </div>
+      ) : (
+        <div className="relative" style={{ minHeight: height }}>
+          {placeholderVisible && (
+            <div className="pointer-events-none absolute left-3 top-3 text-muted-foreground text-sm">
+              {placeholder}
+            </div>
+          )}
+          <MonacoEditorWrapper
+            value={value}
+            onChange={onChange}
+            height={height}
+            language="markdown"
+            withContainer={false}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }

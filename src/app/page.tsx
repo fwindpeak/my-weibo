@@ -19,7 +19,6 @@ export default function Home() {
   const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({})
   const [commentLoading, setCommentLoading] = useState<Record<string, boolean>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
   const [user, setUser] = useState<AppUser | null>(null)
   const [loginModalState, setLoginModalState] = useState<{ open: boolean; mode: 'admin' | 'user' }>({
     open: false,
@@ -693,12 +692,10 @@ export default function Home() {
         {user && user.isAdmin && (
           <CreateMicroblogCard
             content={content}
-            showPreview={showPreview}
             selectedImages={selectedImages}
             isSubmitting={isSubmitting}
             formatFullTime={formatFullTime}
             onContentChange={setContent}
-            onTogglePreview={() => setShowPreview((prev) => !prev)}
             onImageUpload={handleImageUpload}
             onRemoveImage={removeImage}
             onSubmit={handleSubmit}

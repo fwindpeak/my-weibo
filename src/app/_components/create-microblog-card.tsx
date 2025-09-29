@@ -1,23 +1,18 @@
 'use client'
 
 import { ChangeEvent } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import LexicalEditor from '@/components/ui/lexical-editor'
-import { Edit3, Eye, Image as ImageIcon, Send } from 'lucide-react'
+import { Image as ImageIcon, Send } from 'lucide-react'
 
 interface CreateMicroblogCardProps {
   content: string
-  showPreview: boolean
   selectedImages: File[]
   isSubmitting: boolean
   formatFullTime: (dateString: string) => string
   onContentChange: (value: string) => void
-  onTogglePreview: () => void
   onImageUpload: (event: ChangeEvent<HTMLInputElement>) => void
   onRemoveImage: (index: number) => void
   onSubmit: () => void
@@ -25,12 +20,10 @@ interface CreateMicroblogCardProps {
 
 export default function CreateMicroblogCard({
   content,
-  showPreview,
   selectedImages,
   isSubmitting,
   formatFullTime,
   onContentChange,
-  onTogglePreview,
   onImageUpload,
   onRemoveImage,
   onSubmit,
@@ -41,24 +34,13 @@ export default function CreateMicroblogCard({
     <Card className="mb-3 sm:mb-4 shadow-md border-primary/20 hover:shadow-lg transition-all duration-300">
       <CardContent className="space-y-2.5">
         <div className="space-y-2">
-          {!showPreview ? (
-            <LexicalEditor
-              value={content}
-              onChange={onContentChange}
-              placeholder="分享你的想法..."
-              height="120px"
-            />
-          ) : (
-            <div className="min-h-[120px] p-3 border border-primary/20 rounded-lg bg-muted/20 prose prose-sm max-w-none dark:prose-invert">
-              {content ? (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                  {content}
-                </ReactMarkdown>
-              ) : (
-                <p className="text-muted-foreground text-sm">预览区域，输入内容后将显示渲染效果...</p>
-              )}
-            </div>
-          )}
+          <LexicalEditor
+            value={content}
+            onChange={onContentChange}
+            placeholder="分享你的想法..."
+            height="120px"
+            enablePreviewToggle
+          />
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -68,15 +50,6 @@ export default function CreateMicroblogCard({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onTogglePreview}
-                className="h-8 w-8 p-0 hover:bg-primary/10"
-              >
-                {showPreview ? <Edit3 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </Button>
-
               <input
                 type="file"
                 accept="image/*"
