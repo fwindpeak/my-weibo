@@ -89,6 +89,13 @@ export default function HomeHeader({
                       placeholder="搜索内容..."
                       value={searchTerm}
                       onChange={(e) => onSearchChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onSearchClick()
+                        } else if (e.key === 'Escape') {
+                          onToggleSearch()
+                        }
+                      }}
                       className="h-9 rounded-full border-muted-foreground/20 bg-background/80 pl-10 pr-10 text-sm"
                       data-interactive="true"
                     />
@@ -105,7 +112,7 @@ export default function HomeHeader({
                       </Button>
                     )}
                   </div>
-                  <Button
+                  {/* <Button
                     size="sm"
                     className="h-9 rounded-full px-3 text-xs whitespace-nowrap"
                     onClick={onSearchClick}
@@ -113,7 +120,7 @@ export default function HomeHeader({
                   >
                     <Search className="mr-1 h-3 w-3" />
                     搜索
-                  </Button>
+                  </Button> */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -138,47 +145,9 @@ export default function HomeHeader({
               )}
             </div>
             <div className="flex items-center justify-between gap-2 sm:justify-end" data-interactive="true">
-              {isSearching && (
-                <Badge variant="secondary" className="w-fit rounded-full px-2 py-0.5 text-[11px]">
-                  搜索结果: "{searchTerm}"
-                </Badge>
-              )}
               {user ? (
-                <div className="flex items-center gap-2 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 shadow-sm">
-                  <Avatar className="h-8 w-8 border border-primary/30">
-                    <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                      {user.username.slice(0, 1).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="text-[11px] font-medium text-muted-foreground sm:hidden">
-                    {user.isAdmin ? '管理员' : '已登录'}
-                  </span>
-                  <div className="hidden text-left sm:flex sm:flex-col sm:leading-tight">
-                    <span className="text-xs font-medium text-foreground">{user.username}</span>
-                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                      {user.isAdmin ? (
-                        <>
-                          <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                          管理员
-                        </>
-                      ) : (
-                        <>
-                          <User2 className="h-3.5 w-3.5" />访客
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
-                    onClick={onLogoutClick}
-                    data-interactive="true"
-                  >
-                    <LogOut className="mr-1 h-3.5 w-3.5" />
-                    退出
-                  </Button>
-                </div>
+                <LogOut className="cursor-pointer" onClick={onLogoutClick}>
+                </LogOut>
               ) : (
                 <Button
                   variant="outline"
