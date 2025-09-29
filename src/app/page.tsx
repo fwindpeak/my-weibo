@@ -13,7 +13,7 @@ import { LogOut, Trash2 } from 'lucide-react'
 
 export default function Home() {
   const [content, setContent] = useState('')
-  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [selectedImages, setSelectedImages] = useState<Array<{ file: File; url: string; alt: string }>>([])
   const [microblogs, setMicroblogs] = useState<Microblog[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({})
@@ -70,21 +70,33 @@ export default function Home() {
 
   useEffect(() => {
     const loadSession = async () => {
-      try {
-        const response = await fetch('/api/auth/session', {
-          method: 'GET',
-          cache: 'no-store',
-        })
+    try {
+      const cacheKey = 'my-weibo-next-session'
+      const cached = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(cacheKey) : null
 
-        if (response.ok) {
-          const data = await response.json()
-          setUser(data.user ?? null)
-        } else {
-          setUser(null)
-        }
-      } catch (error) {
-        console.error('Failed to load session:', error)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        setUser(parsed.user ?? null)
+        return
       }
+
+      const response = await fetch('/api/auth/session', {
+        method: 'GET',
+        cache: 'no-store',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setUser(data.user ?? null)
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.setItem(cacheKey, JSON.stringify(data))
+        }
+      } else {
+        setUser(null)
+      }
+    } catch (error) {
+      console.error('Failed to load session:', error)
+    }
     }
 
     loadSession()
@@ -167,11 +179,22 @@ export default function Home() {
 
   const handleImageUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || [])
-    setSelectedImages((prev) => [...prev, ...files])
+    const previews = files.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      alt: file.name
+    }))
+    setSelectedImages((prev) => [...prev, ...previews])
   }
 
   const removeImage = (index: number) => {
-    setSelectedImages((prev) => prev.filter((_, i) => i !== index))
+    setSelectedImages((prev) => {
+      const target = prev[index]
+      if (target) {
+        URL.revokeObjectURL(target.url)
+      }
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const handleSubmit = async () => {
@@ -185,7 +208,8 @@ export default function Home() {
     setIsSubmitting(true)
     try {
       const imageUrls = [] as { url: string; altText: string }[]
-      for (const file of selectedImages) {
+      for (const preview of selectedImages) {
+        const { file } = preview
         const formData = new FormData()
         formData.append('image', file)
 
@@ -218,6 +242,7 @@ export default function Home() {
         const newMicroblog = await response.json()
         setMicroblogs((prev) => [newMicroblog, ...prev])
         setContent('')
+        selectedImages.forEach((preview) => URL.revokeObjectURL(preview.url))
         setSelectedImages([])
       } else {
         console.error('Failed to create microblog')
