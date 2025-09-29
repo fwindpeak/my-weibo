@@ -8,7 +8,7 @@ import rehypeHighlight from 'rehype-highlight'
 import MonacoEditorWrapper from './monaco-editor-wrapper'
 import { cn } from '@/lib/utils'
 
-interface LexicalEditorProps {
+interface MarkdownEditorProps {
   value: string
   onChange?: (value: string) => void
   placeholder?: string
@@ -24,7 +24,7 @@ export default function LexicalEditor({
   readOnly = false,
   height = '200px',
   enablePreviewToggle = false
-}: LexicalEditorProps) {
+}: MarkdownEditorProps) {
   const [mode, setMode] = useState<'source' | 'preview'>(readOnly ? 'preview' : 'source')
   const [isFocused, setIsFocused] = useState(false)
 
@@ -87,15 +87,15 @@ export default function LexicalEditor({
       {showPreview ? (
         <div
           className={cn(
-            'relative min-h-[120px] overflow-y-auto bg-muted/20 p-3 text-sm leading-relaxed text-foreground prose prose-sm max-w-none dark:prose-invert',
-            !readOnly && 'border-t border-border/50'
+            'relative min-h-[120px] overflow-y-auto rounded-lg bg-background p-4 text-base leading-relaxed text-foreground shadow-sm',
+            !readOnly && 'border border-border'
           )}
           style={{ minHeight: height }}
         >
           {value?.trim() ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-              {value}
-            </ReactMarkdown>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
+            </div>
           ) : (
             <p className="text-muted-foreground">预览区域，输入内容后将显示渲染效果...</p>
           )}

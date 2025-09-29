@@ -53,15 +53,19 @@ export default function MonacoEditorWrapper({
       options={{
         minimap: { enabled: false },
         fontSize: 14,
-        lineNumbers: 'on',
+        lineNumbers: 'off',
         roundedSelection: false,
         scrollBeyondLastLine: false,
         automaticLayout: true,
         wordWrap: 'on',
-        folding: true,
-        showFoldingControls: 'always',
-        renderLineHighlight: 'all',
-        selectOnLineNumbers: true,
+        folding: false,
+        showFoldingControls: 'never',
+        renderLineHighlight: 'none',
+        guides: {
+          indentation: false,
+          highlightActiveIndentation: false
+        },
+        selectOnLineNumbers: false,
         matchBrackets: 'always',
         autoIndent: 'advanced',
         formatOnPaste: true,
@@ -73,11 +77,12 @@ export default function MonacoEditorWrapper({
         tabSize: 2,
         insertSpaces: true,
         scrollbar: {
-          verticalScrollbarSize: 8,
-          horizontalScrollbarSize: 8
+          verticalScrollbarSize: 6,
+          horizontalScrollbarSize: 6,
+          useShadows: false
         },
-        lineDecorationsWidth: 10,
-        lineNumbersMinChars: 3,
+        lineDecorationsWidth: 0,
+        renderWhitespace: 'selection',
         padding: { top: 10, bottom: 10 }
       }}
     />
