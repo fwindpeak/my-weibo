@@ -7,7 +7,7 @@ import rehypeHighlight from 'rehype-highlight'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
+import LexicalEditor from '@/components/ui/lexical-editor'
 import { Edit3, Eye, Image as ImageIcon, Send } from 'lucide-react'
 
 interface CreateMicroblogCardProps {
@@ -42,11 +42,11 @@ export default function CreateMicroblogCard({
       <CardContent className="space-y-2.5">
         <div className="space-y-2">
           {!showPreview ? (
-            <Textarea
-              placeholder="分享你的想法..."
+            <LexicalEditor
               value={content}
-              onChange={(e) => onContentChange(e.target.value)}
-              className="min-h-[120px] resize-none border-primary/20 focus:border-primary/40 transition-colors font-mono text-base"
+              onChange={onContentChange}
+              placeholder="分享你的想法..."
+              height="120px"
             />
           ) : (
             <div className="min-h-[120px] p-3 border border-primary/20 rounded-lg bg-muted/20 prose prose-sm max-w-none dark:prose-invert">
