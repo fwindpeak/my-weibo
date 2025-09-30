@@ -2,14 +2,24 @@ import { Elysia } from 'elysia'
 import { cookie } from '@elysiajs/cookie'
 import { cors } from '@elysiajs/cors'
 import { staticPlugin } from '@elysiajs/static'
+import { existsSync } from 'fs'
 import { mkdir, writeFile } from 'fs/promises'
-import { join } from 'path'
+import { join, resolve } from 'path'
 
 import { db } from '@/lib/db'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { clearSession, createSession, getSessionUser } from '@/lib/session'
 
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads')
+function resolveUploadsDir() {
+  const envPath = process.env.UPLOADS_DIR?.trim()
+  if (envPath) {
+    return envPath.startsWith('/') ? envPath : resolve(process.cwd(), envPath)
+  }
+
+  return join(process.cwd(), 'storage', 'uploads')
+}
+
+const UPLOAD_DIR = resolveUploadsDir()
 
 async function ensureUploadDir() {
   await mkdir(UPLOAD_DIR, { recursive: true })
@@ -775,11 +785,37 @@ const app = new Elysia()
       })
   )
 
-const clientDir = join(process.cwd(), 'dist', 'client')
+function resolveClientDir() {
+  const candidates: string[] = []
+
+  const envPath = process.env.CLIENT_ASSETS_DIR?.trim()
+  if (envPath) {
+    candidates.push(envPath.startsWith('/') ? envPath : join(process.cwd(), envPath))
+  }
+
+  candidates.push(
+    join(process.cwd(), 'build', 'client'),
+    join(process.cwd(), 'dist', 'client'),
+    join(process.cwd(), 'dist')
+  )
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return join(process.cwd(), 'build', 'client')
+}
+
+const clientDir = resolveClientDir()
 const publicDir = join(process.cwd(), 'public')
+
+await ensureUploadDir()
 
 app.use(staticPlugin({ assets: clientDir, prefix: '/' }))
 app.use(staticPlugin({ assets: publicDir, prefix: '/' }))
+app.use(staticPlugin({ assets: UPLOAD_DIR, prefix: '/uploads' }))
 
 app.get('*', async () => {
   const indexFile = join(clientDir, 'index.html')

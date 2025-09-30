@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import path from 'node:path'
 
+const clientOutDir = process.env.CLIENT_BUILD_OUT_DIR ?? 'build/client'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -23,7 +25,12 @@ export default defineConfig({
     }
   },
   build: {
-    outDir: 'dist/client',
-    emptyOutDir: true
+    outDir: clientOutDir,
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   }
 })
