@@ -34,16 +34,28 @@ bun run build
 
 构建结果：
 
-- `build/server.js`：单文件 Elysia 服务，可在生产环境使用 `bun run` 执行。
-- `build/client/`：静态前端资源（JS + CSS），服务端会自动托管。
+- `server.js`：打包后的 Elysia 服务入口，可直接执行 `bun run ./server.js`。
+- `build/server.js`：与 `server.js` 内容一致，保留在 `build/` 目录中，便于自定义部署流程。
+- `client/`：静态前端资源（JS + CSS），服务端会自动托管。
 
-启动构建后的服务（同时托管 API 与前端）：
+启动构建后的服务：
 
-```bash
-bun run start
-```
+- 同时托管 API 与前端（单进程模式）：
 
-若需自定义静态资源目录，可设置 `CLIENT_ASSETS_DIR` 指向其它路径。
+  ```bash
+  bun run serve
+  # 或者
+  bun run ./server.js
+  ```
+
+- 仅运行 API（静态资源交由 Nginx 等外部服务）：
+
+  ```bash
+  bun run start:api
+  ```
+
+若需自定义静态资源目录，可设置 `CLIENT_ASSETS_DIR` 指向其它路径；
+通过 `SERVE_CLIENT=false` 可在自定义脚本中禁用前端托管。
 
 ## 正式环境部署流程
 
@@ -57,21 +69,32 @@ bun run start
    ```
 
 4. **准备静态资源与上传目录**：
-   - 将 `build/client/` 同步到目标服务器（如使用容器，可挂载为只读卷）。
+   - 将 `client/` 同步到目标服务器（如使用容器，可挂载为只读卷）。
    - 为 `UPLOADS_DIR` 指定的路径创建持久化存储，并赋予写权限；不要将真实上传文件放进 `build/` 目录。
 5. **启动服务**：
 
-   ```bash
-   bun run start
-   ```
+   - 单进程模式（API + 前端）：
 
-   该命令会读取环境变量，侦听 `PORT`，并从 `CLIENT_ASSETS_DIR`（默认 `build/client`）与 `UPLOADS_DIR`（默认 `storage/uploads`）提供静态内容。
+     ```bash
+     bun run serve
+     ```
+
+   - 仅 API（静态资源由外部托管）：
+
+     ```bash
+     bun run start:api
+     ```
+
+   两种模式都会读取环境变量并侦听 `PORT`。前者会从 `CLIENT_ASSETS_DIR`（默认 `client`）提供前端资源，后者则只暴露 API 与 `/uploads`。
 6. **进程托管与日志**：使用 PM2、fly.io、systemd 或 Docker 等方式守护进程，并确保错误日志被采集。
 
 ## 常用脚本
 
 - `bun run clean`：清理 `build/` 目录。
 - `bun run build:client` / `bun run build:server`：分别单独构建前端或后端。
+- `bun run start:standalone`：从根目录 `server.js` 启动单进程服务，包含前端托管。
+- `bun run serve`：`start:standalone` 的别名，便于部署脚本调用。
+- `bun run start:api`：仅启动 API 服务，适合配合 Nginx/OSS 托管静态资源。
 - `bun run start:local`：直接运行 TypeScript 版本的服务，便于调试。
 - `bun run lint`：Biome 静态检查。
 - `bun run db:generate` / `bun run db:reset`：Prisma 常用命令。
@@ -79,7 +102,9 @@ bun run start
 ## 环境变量
 
 - `PORT`：服务监听端口（默认 `3000`）。
-- `CLIENT_ASSETS_DIR`：生产环境下前端静态资源目录，默认 `build/client`。
+- `CLIENT_ASSETS_DIR`：生产环境下前端静态资源目录，默认 `client`。
+- `SERVE_CLIENT`：是否由 Elysia 托管前端资源，默认 `true`。
+- `SERVE_PUBLIC`：是否托管 `public/` 静态资源，默认与 `SERVE_CLIENT` 一致。
 - `UPLOADS_DIR`：用户上传文件的持久化目录，默认 `storage/uploads`。
 - `VITE_API_BASE_URL`：开发模式下前端请求的 API 地址覆写。
 - `DATABASE_URL`：Prisma 数据库连接字符串。

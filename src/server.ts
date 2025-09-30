@@ -25,6 +25,52 @@ async function ensureUploadDir() {
   await mkdir(UPLOAD_DIR, { recursive: true })
 }
 
+function resolveClientDir() {
+  const candidates: string[] = []
+
+  const envPath = process.env.CLIENT_ASSETS_DIR?.trim()
+  if (envPath) {
+    candidates.push(envPath.startsWith('/') ? envPath : join(process.cwd(), envPath))
+  }
+
+  candidates.push(
+    join(process.cwd(), 'client'),
+    join(process.cwd(), 'public', 'client'),
+    join(process.cwd(), 'build', 'client'),
+    join(process.cwd(), 'dist', 'client'),
+    join(process.cwd(), 'dist')
+  )
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+
+  return join(process.cwd(), 'client')
+}
+
+function readBooleanEnv(key: string, defaultValue: boolean) {
+  const rawValue = process.env[key]
+  if (!rawValue) {
+    return defaultValue
+  }
+
+  const normalized = rawValue.trim().toLowerCase()
+
+  if (['false', '0', 'off', 'no'].includes(normalized)) {
+    return false
+  }
+
+  if (['true', '1', 'on', 'yes'].includes(normalized)) {
+    return true
+  }
+
+  return defaultValue
+}
+
+const serveClientAssets = readBooleanEnv('SERVE_CLIENT', true)
+
 const app = new Elysia()
   .use(cors({ origin: true, credentials: true }))
   .use(cookie())
@@ -754,9 +800,9 @@ const app = new Elysia()
             return { error: 'Only image files are allowed' }
           }
 
-          if (image.size > 5 * 1024 * 1024) {
+          if (image.size > 50 * 1024 * 1024) {
             set.status = 400
-            return { error: 'File size must be less than 5MB' }
+            return { error: 'File size must be less than 50MB' }
           }
 
           await ensureUploadDir()
@@ -785,68 +831,144 @@ const app = new Elysia()
       })
   )
 
-function resolveClientDir() {
-  const candidates: string[] = []
-
-  const envPath = process.env.CLIENT_ASSETS_DIR?.trim()
-  if (envPath) {
-    candidates.push(envPath.startsWith('/') ? envPath : join(process.cwd(), envPath))
-  }
-
-  candidates.push(
-    join(process.cwd(), 'build', 'client'),
-    join(process.cwd(), 'dist', 'client'),
-    join(process.cwd(), 'dist')
-  )
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate
-    }
-  }
-
-  return join(process.cwd(), 'build', 'client')
-}
-
 const clientDir = resolveClientDir()
 const publicDir = join(process.cwd(), 'public')
+const servePublicAssets = readBooleanEnv('SERVE_PUBLIC', serveClientAssets)
 
 await ensureUploadDir()
 
-app.use(staticPlugin({ assets: clientDir, prefix: '/' }))
-app.use(staticPlugin({ assets: publicDir, prefix: '/' }))
 app.use(staticPlugin({ assets: UPLOAD_DIR, prefix: '/uploads' }))
 
-app.get('*', async () => {
-  const indexFile = join(clientDir, 'index.html')
-  const file = Bun.file(indexFile)
+const staticRoots: string[] = []
 
-  if (await file.exists()) {
-    return new Response(file, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-      },
-    })
+if (serveClientAssets) {
+  staticRoots.push(clientDir)
+}
+
+if (servePublicAssets) {
+  staticRoots.push(publicDir)
+}
+
+function normalizePath(pathname: string) {
+  try {
+    return decodeURI(pathname)
+  } catch {
+    return pathname
+  }
+}
+
+async function findStaticFile(pathname: string) {
+  if (staticRoots.length === 0) {
+    return null
   }
 
-  const fallback = Bun.file(join(publicDir, 'index.html'))
-  if (await fallback.exists()) {
-    return new Response(fallback, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-      },
-    })
+  const decodedPath = normalizePath(pathname)
+  const trimmed = decodedPath.replace(/^\/+/, '')
+  const candidates: string[] = []
+
+  if (trimmed.length === 0) {
+    candidates.push('index.html')
+  } else {
+    candidates.push(trimmed)
+
+    const appearsToBeFile = trimmed.includes('.') && !trimmed.endsWith('/')
+    if (!appearsToBeFile) {
+      const base = trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
+      candidates.push(join(base, 'index.html'))
+    }
   }
 
-  return new Response('Client build not found. Run `bun run build` first.', {
-    status: 404,
+  for (const root of staticRoots) {
+    for (const candidate of candidates) {
+      if (!candidate) {
+        continue
+      }
+
+      const file = Bun.file(join(root, candidate))
+      if (await file.exists()) {
+        return file
+      }
+    }
+  }
+
+  return null
+}
+
+if (staticRoots.length > 0) {
+  app.get('*', async ({ request }) => {
+    const url = new URL(request.url)
+    const pathname = url.pathname
+
+    if (pathname.startsWith('/api') || pathname.startsWith('/uploads')) {
+      return new Response('Not Found', { status: 404 })
+    }
+
+    const staticFile = await findStaticFile(pathname)
+    if (staticFile) {
+      return new Response(staticFile)
+    }
+
+    if (!serveClientAssets) {
+      return new Response('Not Found', { status: 404 })
+    }
+
+    if (pathname.includes('.') && !pathname.endsWith('.html')) {
+      return new Response('Not Found', { status: 404 })
+    }
+
+    const acceptHeader = request.headers.get('accept')?.toLowerCase() ?? ''
+    const prefersHtml =
+      acceptHeader.length === 0 ||
+      acceptHeader.includes('text/html') ||
+      acceptHeader.includes('text/*') ||
+      acceptHeader.includes('application/xhtml') ||
+      acceptHeader.includes('*/*')
+
+    if (!prefersHtml) {
+      return new Response('Not Found', { status: 404 })
+    }
+
+    const indexFile = Bun.file(join(clientDir, 'index.html'))
+    if (await indexFile.exists()) {
+      return new Response(indexFile, {
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+        },
+      })
+    }
+
+    if (servePublicAssets) {
+      const publicIndex = Bun.file(join(publicDir, 'index.html'))
+      if (await publicIndex.exists()) {
+        return new Response(publicIndex, {
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+          },
+        })
+      }
+    }
+
+    return new Response('Client build not found. Run `bun run build` first.', {
+      status: 404,
+    })
   })
-})
+}
 
 const port = Number(process.env.PORT || 3000)
 
 app.listen(port, ({ port }) => {
   console.log(`🚀 Server ready at http://localhost:${port}`)
+  if (serveClientAssets) {
+    console.log(`🪄 Serving client assets from ${clientDir}`)
+  } else {
+    console.log('🛰️ SERVE_CLIENT disabled - running in API-only mode')
+  }
+
+  if (servePublicAssets) {
+    console.log(`📁 Public assets directory: ${publicDir}`)
+  }
+
+  console.log(`📂 Uploads directory: ${UPLOAD_DIR}`)
 })
 
 export type MyWeiboApp = typeof app

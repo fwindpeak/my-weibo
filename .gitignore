@@ -19,6 +19,8 @@
 
 # production
 /build
+/client
+/server.js
 
 # misc
 .DS_Store
