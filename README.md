@@ -1,6 +1,6 @@
 # My Weibo · Vite + Elysia
 
-Bun 驱动的 React SPA，后端使用 Elysia + Prisma。
+Bun 驱动的 React SPA，后端使用 Elysia + Drizzle ORM。
 
 ## 开发流程
 
@@ -60,7 +60,7 @@ bun run build
 ## 正式环境部署流程
 
 1. **准备运行环境**：安装 Bun ≥ 1.2，并确保有可写目录用于持久化用户上传（推荐 `storage/uploads`）。
-2. **配置环境变量**：复制 `.env.example` 为 `.env.production` 或 `.env.local`，设置 `DATABASE_URL`、`PORT` 等。若上传目录不在默认位置，设定 `UPLOADS_DIR`（绝对路径或相对当前项目路径）。
+2. **配置环境变量**：复制 `.env.example` 为 `.env.production` 或 `.env.local`，设置 `DATABASE_URL`、`PORT` 等。若上传目录不在默认位置，设定 `UPLOADS_DIR`（绝对路径或相对当前项目路径）。数据库使用 SQLite 文件，服务启动时会自动初始化所需表结构。
 3. **安装依赖并构建**：
 
    ```bash
@@ -85,8 +85,17 @@ bun run build
      bun run start:api
      ```
 
-   两种模式都会读取环境变量并侦听 `PORT`。前者会从 `CLIENT_ASSETS_DIR`（默认 `client`）提供前端资源，后者则只暴露 API 与 `/uploads`。
+ 两种模式都会读取环境变量并侦听 `PORT`。前者会从 `CLIENT_ASSETS_DIR`（默认 `client`）提供前端资源，后者则只暴露 API 与 `/uploads`。
 6. **进程托管与日志**：使用 PM2、fly.io、systemd 或 Docker 等方式守护进程，并确保错误日志被采集。
+
+### 一键部署脚本
+
+若希望将构建与上传自动化，可使用仓库内的 `scripts/deploy.sh`：
+
+1. 复制 `deploy.config.example.json` 为 `deploy.config.json`，填写服务器地址、远程目录与部署后需要执行的命令。
+2. 本地执行 `bun run deploy`（或直接运行 `scripts/deploy.sh`）。脚本会完成构建、打包、上传，并在远端解压后按顺序运行配置里的命令。
+
+> ⚠️ 脚本依赖本机的 `bun`、`python3`、`ssh`、`scp`，并假设目标服务器已安装 Bun。
 
 ## 常用脚本
 
@@ -97,7 +106,7 @@ bun run build
 - `bun run start:api`：仅启动 API 服务，适合配合 Nginx/OSS 托管静态资源。
 - `bun run start:local`：直接运行 TypeScript 版本的服务，便于调试。
 - `bun run lint`：Biome 静态检查。
-- `bun run db:generate` / `bun run db:reset`：Prisma 常用命令。
+- `bun run deploy`：读取 `deploy.config.json`，打包并通过 `scp` 一键部署。
 
 ## 环境变量
 
@@ -107,7 +116,7 @@ bun run build
 - `SERVE_PUBLIC`：是否托管 `public/` 静态资源，默认与 `SERVE_CLIENT` 一致。
 - `UPLOADS_DIR`：用户上传文件的持久化目录，默认 `storage/uploads`。
 - `VITE_API_BASE_URL`：开发模式下前端请求的 API 地址覆写。
-- `DATABASE_URL`：Prisma 数据库连接字符串。
+- `DATABASE_URL`：SQLite 数据库路径（如 `file:./sqlite.db`），用于 Drizzle ORM。
 
 ## 文档
 
@@ -118,4 +127,4 @@ bun run build
 - React 19 + Vite 6
 - Tailwind CSS v4
 - Elysia 1.4（Bun 1.2）
-- Prisma ORM
+- Drizzle ORM (bun-sqlite)

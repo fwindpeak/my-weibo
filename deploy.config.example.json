@@ -1,0 +1,13 @@
+{
+  "host": "your.server.com",
+  "user": "deploy",
+  "port": 22,
+  "deployPath": "/var/www/my-weibo",
+  "serviceName": "my-weibo",
+  "archiveDir": "build/deploy",
+  "postDeployCommands": [
+    "bun install --production",
+    "bun run build",
+    "pm2 restart my-weibo || echo 'Please restart your process manager manually.'"
+  ]
+}
