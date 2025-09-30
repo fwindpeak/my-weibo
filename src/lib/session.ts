@@ -1,6 +1,8 @@
 import { randomBytes } from 'crypto'
+import { eq } from '@/lib/drizzle'
 
 import { db } from '@/lib/db'
+import { sessions } from '@/lib/schema'
 
 export const SESSION_COOKIE_NAME = 'my_weibo_session'
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7
@@ -99,13 +101,11 @@ export async function createSession(context: SessionCookieContext, userId: strin
   const token = randomBytes(32).toString('hex')
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000)
 
-  await db.session.deleteMany({ where: { userId } })
-  await db.session.create({
-    data: {
-      token,
-      userId,
-      expiresAt,
-    },
+  await db.delete(sessions).where(eq(sessions.userId, userId))
+  await db.insert(sessions).values({
+    token,
+    userId,
+    expiresAt,
   })
 
   setSessionCookie(context, token)
@@ -119,11 +119,11 @@ export async function getSessionUser(cookie: CookieValues, removeCookie: RemoveC
     return null
   }
 
-  const session = await db.session.findUnique({
-    where: { token },
-    include: {
+  const session = await db.query.sessions.findFirst({
+    where: eq(sessions.token, token),
+    with: {
       user: {
-        select: {
+        columns: {
           id: true,
           username: true,
           email: true,
@@ -133,7 +133,7 @@ export async function getSessionUser(cookie: CookieValues, removeCookie: RemoveC
     },
   })
 
-  if (!session) {
+  if (!session || !session.user) {
     if (typeof removeCookie === 'function') {
       removeCookie(SESSION_COOKIE_NAME)
     }
@@ -141,7 +141,7 @@ export async function getSessionUser(cookie: CookieValues, removeCookie: RemoveC
   }
 
   if (session.expiresAt.getTime() <= Date.now()) {
-    await db.session.delete({ where: { token } })
+    await db.delete(sessions).where(eq(sessions.token, token))
     if (typeof removeCookie === 'function') {
       removeCookie(SESSION_COOKIE_NAME)
     }
@@ -155,7 +155,7 @@ export async function clearSession(cookie: CookieValues, removeCookie: RemoveCoo
   const token = normalizeCookieValue(cookie[SESSION_COOKIE_NAME])
 
   if (token) {
-    await db.session.deleteMany({ where: { token } })
+    await db.delete(sessions).where(eq(sessions.token, token))
   }
 
   if (typeof removeCookie === 'function') {
