@@ -1,16 +1,8 @@
 'use client'
 
 import { useTheme } from 'next-themes'
-import dynamic from 'next/dynamic'
+import MonacoEditor, { type OnMount } from '@monaco-editor/react'
 import { cn } from '@/lib/utils'
-
-// 动态导入Monaco Editor，避免SSR问题
-const MonacoEditor = dynamic(
-  () => import('@monaco-editor/react').then((mod) => mod.default),
-  { ssr: false }
-)
-
-import type { OnMount } from '@monaco-editor/react'
 
 interface MonacoEditorWrapperProps {
   value: string

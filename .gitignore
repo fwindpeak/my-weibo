@@ -42,3 +42,9 @@ next-env.d.ts
 
 /prisma/db/
 /public/uploads/
+
+/dist/
+
+.bun-cache/
+
+.tmp/

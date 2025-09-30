@@ -3,15 +3,16 @@
 import { ChangeEvent, useEffect, useState } from 'react'
 import 'highlight.js/styles/github.css'
 import LoginModal from '@/components/auth/login-modal'
-import HomeHeader from './_components/home-header'
-import CreateMicroblogCard, { SelectedImageItem } from './_components/create-microblog-card'
-import MicroblogList from './_components/microblog-list'
+import HomeHeader from '@/features/home/home-header'
+import CreateMicroblogCard, { SelectedImageItem } from '@/features/home/create-microblog-card'
+import MicroblogList from '@/features/home/microblog-list'
 import { AppUser, GuestIdentity, Microblog } from '@/types/microblog'
-import type { EditableImage } from './_components/microblog-card'
+import type { EditableImage } from '@/features/home/microblog-card'
 import { MessageBox } from '@/components/ui/message-box'
+import { apiFetch } from '@/lib/api-client'
 import { LogOut, Trash2 } from 'lucide-react'
 
-export default function Home() {
+export default function HomePage() {
   const [content, setContent] = useState('')
   const [selectedImages, setSelectedImages] = useState<SelectedImageItem[]>([])
   const [microblogs, setMicroblogs] = useState<Microblog[]>([])
@@ -52,7 +53,7 @@ export default function Home() {
     const formData = new FormData()
     formData.append('image', file)
 
-    const response = await fetch('/api/upload', {
+    const response = await apiFetch('/api/upload', {
       method: 'POST',
       body: formData,
     })
@@ -104,7 +105,7 @@ export default function Home() {
         return
       }
 
-      const response = await fetch('/api/auth/session', {
+      const response = await apiFetch('/api/auth/session', {
         method: 'GET',
         cache: 'no-store',
       })
@@ -146,7 +147,7 @@ export default function Home() {
     try {
       setIsLoading(true)
       const url = search ? `/api/microblogs?search=${encodeURIComponent(search)}` : '/api/microblogs'
-      const response = await fetch(url)
+      const response = await apiFetch(url)
       if (response.ok) {
         const data = await response.json()
         setMicroblogs(data)
@@ -270,7 +271,7 @@ export default function Home() {
 
     setIsSubmitting(true)
     try {
-      const response = await fetch('/api/microblogs', {
+      const response = await apiFetch('/api/microblogs', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -313,7 +314,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`/api/microblogs/${microblogId}/like`, {
+      const response = await apiFetch(`/api/microblogs/${microblogId}/like`, {
         method: 'POST',
       })
 
@@ -385,7 +386,7 @@ export default function Home() {
       try {
         setCommentLoading((prev) => ({ ...prev, [microblogId]: true }))
 
-        const response = await fetch(`/api/microblogs/${microblogId}/comments`, {
+        const response = await apiFetch(`/api/microblogs/${microblogId}/comments`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -426,7 +427,7 @@ export default function Home() {
       try {
         setCommentLoading((prev) => ({ ...prev, [microblogId]: true }))
 
-        const response = await fetch(`/api/microblogs/${microblogId}/comments`, {
+        const response = await apiFetch(`/api/microblogs/${microblogId}/comments`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -486,7 +487,7 @@ export default function Home() {
 
   const confirmLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      await apiFetch('/api/auth/logout', {
         method: 'POST',
       })
     } catch (error) {
@@ -534,7 +535,7 @@ export default function Home() {
     setIsDeletingMicroblog(true)
 
     try {
-      const response = await fetch(`/api/microblogs/${microblogToDelete}`, {
+      const response = await apiFetch(`/api/microblogs/${microblogToDelete}`, {
         method: 'DELETE',
       })
 
@@ -718,7 +719,7 @@ export default function Home() {
       }))
 
     try {
-      const response = await fetch(`/api/microblogs/${microblogId}`, {
+      const response = await apiFetch(`/api/microblogs/${microblogId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -795,7 +796,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`/api/comments/${commentId}`, {
+      const response = await apiFetch(`/api/comments/${commentId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -840,7 +841,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`/api/comments/${commentId}`, {
+      const response = await apiFetch(`/api/comments/${commentId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

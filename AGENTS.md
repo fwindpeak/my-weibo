@@ -1,35 +1,35 @@
 # Repository Guidelines
 
-This guide helps contributors ship features confidently in `my-weibo-next`.
+This guide helps contributors ship features confidently on the Bun + Vite + Elysia stack.
 
 ## Project Structure & Module Organization
-- `src/app`: App Router routes, layouts, API handlers.
-- `src/components`: Shared UI building blocks; colocate component-specific styles.
-- `src/hooks`: Reusable client hooks; prefix with `use`.
-- `src/lib`: Utilities, API helpers, Prisma adapters.
+- `src/main.tsx`: Vite bootstrapping entry for the React client.
+- `src/App.tsx`: Top-level composition for the SPA shell.
+- `src/server.ts`: Elysia HTTP server (REST + static assets).
+- `src/components`, `src/features`, `src/hooks`, `src/lib`, `src/providers`, `src/types`: Shared UI and logic modules; colocate styles with components.
 - `prisma`: `schema.prisma`, migrations, generated client.
-- `public`: Static assets, icons; `scripts`: Node helpers for maintenance.
+- `public`: Static assets (served by Vite/Elysia); `scripts`: Bun/Node helpers for maintenance.
 
 ## Build, Test, and Development Commands
-- `npm run dev` / `bun run dev`: Turbopack dev server.
-- `npm run build`: Production build verification.
-- `npm run start`: Serve compiled output locally.
-- `npm run lint`: Biome lint + type-aware checks.
-- `npm run format`: Biome formatting fixer.
-- `npm run db:generate`: Rebuild Prisma client after schema tweaks.
-- `npm run db:reset`: Reset database and rerun migrations (destructive).
+- `bun run dev`: Start the Elysia API server with hot reload.
+- `bun run dev:client`: Launch the Vite dev server for the React UI.
+- `bun run build`: Build the Vite client bundle and compile the Bun executable (see `package.json`).
+- `bun run lint`: Biome lint + type-aware checks.
+- `bun run format`: Biome formatting fixer.
+- `bun run db:generate`: Rebuild Prisma client after schema tweaks.
+- `bun run db:reset`: Reset database and rerun migrations (destructive).
 
 ## Coding Style & Naming Conventions
 - TypeScript + React function components; PascalCase components, camelCase utilities.
 - Keep hooks in `src/hooks` and start names with `use`.
-- Prefer async/await and explicit return types for exported helpers.
+- Prefer async/await and explicit return types for exported helpers and server modules.
 - Rely on Biome (2-space indent, trailing commas) for formatting and linting.
 - Tailwind classes follow logical grouping; avoid inline style objects unless necessary.
 
 ## Testing Guidelines
-- Co-locate tests near features (`src/app/feed/feed.test.tsx`) or mirror folders under `src/__tests__`.
+- Co-locate tests near features (`src/features/feed/feed.test.tsx`) or mirror folders under `src/__tests__`.
 - Focus on data transforms and interactive flows; snapshot only complex layouts.
-- Run `npm run lint` and smoke test with `npm run dev` before opening a PR, and document manual verification.
+- Run `bun run lint` and smoke test with `bun run dev` / `bun run dev:client` before opening a PR, and document manual verification.
 
 ## Commit & Pull Request Guidelines
 - Use Conventional Commits (`feat:`, `fix:`, `perf:`…) as seen in history; keep subjects ≤72 chars.
@@ -39,5 +39,5 @@ This guide helps contributors ship features confidently in `my-weibo-next`.
 
 ## Database & Environment Setup
 - Copy `.env.example` → `.env.local` and set `DATABASE_URL` (e.g., Postgres).
-- After editing `schema.prisma`, run `npm run db:generate`; when migrations change, follow with `npm run db:reset` on local dev only.
+- After editing `schema.prisma`, run `bun run db:generate`; when migrations change, follow with `bun run db:reset` on local dev only.
 - Treat `.env*` files as secrets; never commit credentials or tokens.

@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
+    "dev": "bun --watch src/server.ts",
+    "dev:client": "vite dev --host",
+    "build": "bun run build:client && bun run build:server",
+    "build:client": "vite build",
+    "build:server": "bun build src/server.ts --compile --outfile build/my-weibo --embed=dist/client/** --embed=public/**",
+    "start": "bun run src/server.ts",
     "lint": "biome check",
     "format": "biome format --write",
     "db:generate": "prisma generate",
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+    "@elysiajs/cookie": "^0.8.0",
+    "@elysiajs/cors": "^1.4.0",
+    "@elysiajs/static": "^1.4.0",
     "@lexical/markdown": "^0.36.1",
     "@lexical/react": "^0.36.1",
     "@monaco-editor/react": "^4.7.0",
@@ -45,10 +51,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "elysia": "^1.4.8",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.544.0",
-    "next": "15.5.4",
     "next-themes": "^0.4.6",
     "prisma": "^6.16.2",
     "react": "19.1.0",
@@ -73,6 +79,9 @@
     "@types/react-dom": "^19",
     "@tailwindcss/postcss": "^4",
     "tailwindcss": "^4",
-    "@biomejs/biome": "2.2.0"
+    "@biomejs/biome": "2.2.0",
+    "@vitejs/plugin-react-swc": "^3.11.0",
+    "bun-types": "^1.2.23",
+    "vite": "^6.3.6"
   }
 }

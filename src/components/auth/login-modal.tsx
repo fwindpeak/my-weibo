@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { apiFetch } from '@/lib/api-client'
 import { AppUser } from '@/types/microblog'
 import { Lock, Mail, User, X } from 'lucide-react'
 
@@ -91,7 +92,7 @@ export default function LoginModal({ isOpen, initialMode = 'admin', onClose, onL
     setError('')
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
