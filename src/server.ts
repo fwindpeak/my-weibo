@@ -1,12 +1,11 @@
-import { Elysia } from 'elysia'
-import { cookie } from '@elysiajs/cookie'
-import { cors } from '@elysiajs/cors'
-import { staticPlugin } from '@elysiajs/static'
+import { Elysia, cookie, cors, staticPlugin } from '@/lib/server-framework'
 import { existsSync } from 'fs'
 import { mkdir, writeFile } from 'fs/promises'
 import { join, resolve } from 'path'
+import { and, asc, desc, eq, inArray, like } from '@/lib/drizzle'
 
 import { db } from '@/lib/db'
+import { comments, images, likes, microblogs, users } from '@/lib/schema'
 import { hashPassword, verifyPassword } from '@/lib/password'
 import { clearSession, createSession, getSessionUser } from '@/lib/session'
 
@@ -71,6 +70,46 @@ function readBooleanEnv(key: string, defaultValue: boolean) {
 
 const serveClientAssets = readBooleanEnv('SERVE_CLIENT', true)
 
+const microblogQueryConfig = {
+  user: {
+    columns: {
+      id: true,
+      username: true,
+      email: true,
+      isAdmin: true,
+    },
+  },
+  images: {
+    orderBy: asc(images.createdAt),
+  },
+  likes: {
+    columns: {
+      id: true,
+      userId: true,
+      createdAt: true,
+    },
+  },
+  comments: {
+    orderBy: desc(comments.createdAt),
+    with: {
+      user: {
+        columns: {
+          id: true,
+          username: true,
+          isAdmin: true,
+        },
+      },
+    },
+  },
+} as const
+
+async function getMicroblogById(id: string) {
+  return db.query.microblogs.findFirst({
+    where: eq(microblogs.id, id),
+    with: microblogQueryConfig,
+  })
+}
+
 const app = new Elysia()
   .use(cors({ origin: true, credentials: true }))
   .use(cookie())
@@ -95,11 +134,8 @@ const app = new Elysia()
             return { message: '用户名和密码不能为空' }
           }
 
-          const user = await db.user.findFirst({
-            where: {
-              username,
-              isAdmin: true,
-            },
+          const user = await db.query.users.findFirst({
+            where: (fields) => and(eq(fields.username, username), eq(fields.isAdmin, true)),
           })
 
           if (!user || !user.password) {
@@ -140,11 +176,15 @@ const app = new Elysia()
           const normalizedEmail = email.trim().toLowerCase()
           const normalizedUsername = username?.trim()
 
-          let user = await db.user.findUnique({ where: { email: normalizedEmail } })
+          let user = await db.query.users.findFirst({
+            where: (fields) => eq(fields.email, normalizedEmail),
+          })
 
           if (!user) {
             if (normalizedUsername) {
-              const usernameTaken = await db.user.findUnique({ where: { username: normalizedUsername } })
+              const usernameTaken = await db.query.users.findFirst({
+                where: (fields) => eq(fields.username, normalizedUsername),
+              })
               if (usernameTaken) {
                 set.status = 409
                 return { message: '用户名已被占用' }
@@ -154,14 +194,24 @@ const app = new Elysia()
             const hashedPassword = await hashPassword(password)
             const usernameForCreate = normalizedUsername || normalizedEmail.split('@')[0]
 
-            user = await db.user.create({
-              data: {
+            const createdUsers = await db
+              .insert(users)
+              .values({
                 username: usernameForCreate,
                 email: normalizedEmail,
                 password: hashedPassword,
                 isAdmin: false,
-              },
-            })
+              })
+              .returning()
+
+            const createdUser = Array.isArray(createdUsers)
+              ? ((createdUsers[0] as { id: string; password?: string | null }) ?? null)
+              : null
+            if (!createdUser) {
+              throw new Error('Failed to create user record')
+            }
+
+            user = createdUser
 
             await createSession({ setCookie, set }, user.id)
             const { password: _password, ...userWithoutPassword } = user
@@ -176,13 +226,19 @@ const app = new Elysia()
 
           if (!user.password) {
             const hashedPassword = await hashPassword(password)
-            user = await db.user.update({
-              where: { id: user.id },
-              data: {
+            const updatedUsers = await db
+              .update(users)
+              .set({
                 password: hashedPassword,
                 username: normalizedUsername || user.username,
-              },
-            })
+                updatedAt: new Date(),
+              })
+              .where(eq(users.id, user.id))
+              .returning()
+            const updatedUser = Array.isArray(updatedUsers)
+              ? ((updatedUsers[0] as typeof user) ?? null)
+              : null
+            user = updatedUser ?? user
           } else {
             const isValid = await verifyPassword(password, user.password)
 
@@ -192,18 +248,26 @@ const app = new Elysia()
             }
 
             if (normalizedUsername && normalizedUsername !== user.username) {
-              const usernameTaken = await db.user.findUnique({ where: { username: normalizedUsername } })
+              const usernameTaken = await db.query.users.findFirst({
+                where: (fields) => eq(fields.username, normalizedUsername),
+              })
               if (usernameTaken && usernameTaken.id !== user.id) {
                 set.status = 409
                 return { message: '用户名已被占用' }
               }
 
-              user = await db.user.update({
-                where: { id: user.id },
-                data: {
+              const usernameUpdates = await db
+                .update(users)
+                .set({
                   username: normalizedUsername,
-                },
-              })
+                  updatedAt: new Date(),
+                })
+                .where(eq(users.id, user.id))
+                .returning()
+              const updatedUser = Array.isArray(usernameUpdates)
+                ? ((usernameUpdates[0] as typeof user) ?? null)
+                : null
+              user = updatedUser ?? user
             }
           }
 
@@ -223,62 +287,15 @@ const app = new Elysia()
       .get('/microblogs', async ({ query, set }) => {
         try {
           const search = typeof query?.search === 'string' ? query.search.trim() : ''
-          const whereClause = search
-            ? {
-                OR: [
-                  {
-                    content: {
-                      contains: search,
-                    },
-                  },
-                ],
-              }
-            : {}
+          const searchTerm = search.length > 0 ? `%${search}%` : undefined
 
-          const microblogs = await db.microblog.findMany({
-            where: whereClause,
-            orderBy: {
-              createdAt: 'desc',
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                  isAdmin: true,
-                },
-              },
-              images: {
-                orderBy: {
-                  createdAt: 'asc',
-                },
-              },
-              likes: {
-                select: {
-                  id: true,
-                  userId: true,
-                  createdAt: true,
-                },
-              },
-              comments: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      username: true,
-                      isAdmin: true,
-                    },
-                  },
-                },
-                orderBy: {
-                  createdAt: 'desc',
-                },
-              },
-            },
+          const microblogsList = await db.query.microblogs.findMany({
+            where: searchTerm ? (fields) => like(fields.content, searchTerm) : undefined,
+            orderBy: desc(microblogs.createdAt),
+            with: microblogQueryConfig,
           })
 
-          return microblogs
+          return microblogsList
         } catch (error) {
           console.error('Error fetching microblogs:', error)
           set.status = 500
@@ -299,63 +316,45 @@ const app = new Elysia()
             return { error: 'Only administrators can create microblogs' }
           }
 
-          const { content, images } = body as {
+          const { content, images: imagePayload } = body as {
             content?: string
             images?: Array<{ url: string; altText?: string | null }>
           }
 
-          if (!content && (!images || images.length === 0)) {
+          if (!content && (!imagePayload || imagePayload.length === 0)) {
             set.status = 400
             return { error: 'Content or images are required' }
           }
-
-          const microblog = await db.microblog.create({
-            data: {
+          const createdMicroblogs = await db
+            .insert(microblogs)
+            .values({
               content: content || '',
               userId: sessionUser.id,
-              images: images
-                ? {
-                    create: images.map((img) => ({
-                      url: img.url,
-                      altText: img.altText ?? null,
-                    })),
-                  }
-                : undefined,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  username: true,
-                  email: true,
-                  isAdmin: true,
-                },
-              },
-              images: {
-                orderBy: {
-                  createdAt: 'asc',
-                },
-              },
-              likes: {
-                select: {
-                  id: true,
-                  userId: true,
-                  createdAt: true,
-                },
-              },
-              comments: {
-                include: {
-                  user: {
-                    select: {
-                      id: true,
-                      username: true,
-                      isAdmin: true,
-                    },
-                  },
-                },
-              },
-            },
-          })
+            })
+            .returning()
+
+          const createdMicroblog = Array.isArray(createdMicroblogs)
+            ? ((createdMicroblogs[0] as { id: string }) ?? null)
+            : null
+
+          if (!createdMicroblog) {
+            throw new Error('Failed to create microblog')
+          }
+
+          if (Array.isArray(imagePayload) && imagePayload.length > 0) {
+            await db
+              .insert(images)
+              .values(
+                imagePayload.map((img) => ({
+                  url: img.url,
+                  altText: img.altText ?? null,
+                  microblogId: createdMicroblog.id,
+                }))
+              )
+              .run()
+          }
+
+          const microblog = await getMicroblogById(createdMicroblog.id)
 
           set.status = 201
           return microblog
@@ -386,14 +385,15 @@ const app = new Elysia()
             return { error: 'Content is required' }
           }
 
-          const microblog = await db.microblog.findUnique({
-            where: { id },
-            include: {
+          const microblog = await db.query.microblogs.findFirst({
+            where: eq(microblogs.id, id),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
+                  email: true,
                 },
               },
             },
@@ -409,71 +409,41 @@ const app = new Elysia()
             return { error: 'You can only edit your own microblogs' }
           }
 
-          const result = await db.$transaction(async (tx) => {
+          const updatedMicroblog = await db.transaction(async (tx) => {
             if (Array.isArray(deletedImageIds) && deletedImageIds.length > 0) {
-              await tx.image.deleteMany({
-                where: {
-                  id: {
-                    in: deletedImageIds,
-                  },
-                  microblogId: id,
-                },
-              })
+              await tx
+                .delete(images)
+                .where(and(inArray(images.id, deletedImageIds), eq(images.microblogId, id)))
             }
 
             if (Array.isArray(newImages) && newImages.length > 0) {
-              await tx.image.createMany({
-                data: newImages.map((img) => ({
-                  url: img.url,
-                  altText: img.altText ?? null,
-                  microblogId: id,
-                })),
-              })
+              await tx
+                .insert(images)
+                .values(
+                  newImages.map((img) => ({
+                    url: img.url,
+                    altText: img.altText ?? null,
+                    microblogId: id,
+                  }))
+                )
+                .run()
             }
 
-            return tx.microblog.update({
-              where: { id },
-              data: {
+            await tx
+              .update(microblogs)
+              .set({
                 content: content.trim(),
                 updatedAt: new Date(),
-              },
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                    email: true,
-                    isAdmin: true,
-                  },
-                },
-                images: {
-                  orderBy: {
-                    createdAt: 'asc',
-                  },
-                },
-                likes: {
-                  select: {
-                    id: true,
-                    userId: true,
-                    createdAt: true,
-                  },
-                },
-                comments: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        username: true,
-                        isAdmin: true,
-                      },
-                    },
-                  },
-                },
-              },
+              })
+              .where(eq(microblogs.id, id))
+
+            return tx.query.microblogs.findFirst({
+              where: eq(microblogs.id, id),
+              with: microblogQueryConfig,
             })
           })
 
-          return result
+          return updatedMicroblog
         } catch (error) {
           console.error('Error updating microblog:', error)
           set.status = 500
@@ -490,14 +460,15 @@ const app = new Elysia()
             return { error: 'User must be logged in to delete microblog' }
           }
 
-          const microblog = await db.microblog.findUnique({
-            where: { id },
-            include: {
+          const microblog = await db.query.microblogs.findFirst({
+            where: eq(microblogs.id, id),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
+                  email: true,
                 },
               },
             },
@@ -513,7 +484,7 @@ const app = new Elysia()
             return { error: 'You can only delete your own microblogs' }
           }
 
-          await db.microblog.delete({ where: { id } })
+          await db.delete(microblogs).where(eq(microblogs.id, id))
           return { message: 'Microblog deleted successfully' }
         } catch (error) {
           console.error('Error deleting microblog:', error)
@@ -531,35 +502,36 @@ const app = new Elysia()
             return { error: 'User must be logged in to like microblog' }
           }
 
-          const microblog = await db.microblog.findUnique({ where: { id } })
+          const microblog = await db.query.microblogs.findFirst({
+            where: eq(microblogs.id, id),
+          })
 
           if (!microblog) {
             set.status = 404
             return { error: 'Microblog not found' }
           }
 
-          const existingLike = await db.like.findUnique({
-            where: {
-              microblogId_userId: {
-                microblogId: id,
-                userId: sessionUser.id,
-              },
-            },
+          const existingLike = await db.query.likes.findFirst({
+            where: (fields) =>
+              and(eq(fields.microblogId, id), eq(fields.userId, sessionUser.id)),
           })
 
           if (existingLike) {
-            await db.like.delete({ where: { id: existingLike.id } })
+            await db.delete(likes).where(eq(likes.id, existingLike.id))
             return { liked: false }
           }
 
-          const like = await db.like.create({
-            data: {
+          const likeRows = await db
+            .insert(likes)
+            .values({
               microblogId: id,
               userId: sessionUser.id,
-            },
-          })
+            })
+            .returning()
 
-          return { liked: true, like }
+          const likeRecord = Array.isArray(likeRows) ? likeRows[0] ?? null : null
+
+          return { liked: true, like: likeRecord }
         } catch (error) {
           console.error('Error liking microblog:', error)
           set.status = 500
@@ -581,7 +553,7 @@ const app = new Elysia()
             return { error: 'Only administrators can clear likes' }
           }
 
-          await db.like.deleteMany({ where: { microblogId: id } })
+          await db.delete(likes).where(eq(likes.microblogId, id))
           return { success: true }
         } catch (error) {
           console.error('Error removing likes:', error)
@@ -593,30 +565,30 @@ const app = new Elysia()
         try {
           const { id } = params as { id: string }
 
-          const microblog = await db.microblog.findUnique({ where: { id } })
+          const microblog = await db.query.microblogs.findFirst({
+            where: eq(microblogs.id, id),
+          })
 
           if (!microblog) {
             set.status = 404
             return { error: 'Microblog not found' }
           }
 
-          const comments = await db.comment.findMany({
-            where: { microblogId: id },
-            include: {
+          const commentsList = await db.query.comments.findMany({
+            where: (fields) => eq(fields.microblogId, id),
+            orderBy: desc(comments.createdAt),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
                 },
               },
             },
-            orderBy: {
-              createdAt: 'desc',
-            },
           })
 
-          return comments
+          return commentsList
         } catch (error) {
           console.error('Error fetching comments:', error)
           set.status = 500
@@ -638,7 +610,9 @@ const app = new Elysia()
             return { error: 'Content is required' }
           }
 
-          const microblog = await db.microblog.findUnique({ where: { id } })
+          const microblog = await db.query.microblogs.findFirst({
+            where: eq(microblogs.id, id),
+          })
 
           if (!microblog) {
             set.status = 404
@@ -659,17 +633,29 @@ const app = new Elysia()
             return { error: 'Either session or guestName and guestEmail are required' }
           }
 
-          const comment = await db.comment.create({
-            data: {
+          const createdComments = await db
+            .insert(comments)
+            .values({
               content: content.trim(),
               microblogId: id,
-              userId,
+              userId: userId ?? null,
               guestName: guestName || null,
               guestEmail: guestEmail || null,
-            },
-            include: {
+            })
+            .returning()
+
+          const createdComment = Array.isArray(createdComments)
+            ? ((createdComments[0] as { id: string }) ?? null)
+            : null
+          if (!createdComment) {
+            throw new Error('Failed to create comment')
+          }
+
+          const comment = await db.query.comments.findFirst({
+            where: eq(comments.id, createdComment.id),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
@@ -703,11 +689,11 @@ const app = new Elysia()
             return { error: 'Content is required' }
           }
 
-          const comment = await db.comment.findUnique({
-            where: { id },
-            include: {
+          const comment = await db.query.comments.findFirst({
+            where: eq(comments.id, id),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
@@ -726,14 +712,18 @@ const app = new Elysia()
             return { error: 'You can only edit your own comments' }
           }
 
-          const updatedComment = await db.comment.update({
-            where: { id },
-            data: {
+          await db
+            .update(comments)
+            .set({
               content: content.trim(),
-            },
-            include: {
+            })
+            .where(eq(comments.id, id))
+
+          const updatedComment = await db.query.comments.findFirst({
+            where: eq(comments.id, id),
+            with: {
               user: {
-                select: {
+                columns: {
                   id: true,
                   username: true,
                   isAdmin: true,
@@ -759,11 +749,16 @@ const app = new Elysia()
             return { error: 'User must be logged in to delete comment' }
           }
 
-          const comment = await db.comment.findUnique({
-            where: { id },
-            select: {
+          const comment = await db.query.comments.findFirst({
+            where: eq(comments.id, id),
+            columns: {
               id: true,
               userId: true,
+              microblogId: false,
+              content: false,
+              guestName: false,
+              guestEmail: false,
+              createdAt: false,
             },
           })
 
@@ -777,7 +772,7 @@ const app = new Elysia()
             return { error: 'You can only delete your own comments' }
           }
 
-          await db.comment.delete({ where: { id } })
+          await db.delete(comments).where(eq(comments.id, id))
           return { message: 'Comment deleted successfully' }
         } catch (error) {
           console.error('Error deleting comment:', error)
@@ -905,7 +900,7 @@ if (staticRoots.length > 0) {
 
     const staticFile = await findStaticFile(pathname)
     if (staticFile) {
-      return new Response(staticFile)
+      return new Response(await staticFile.arrayBuffer())
     }
 
     if (!serveClientAssets) {
@@ -930,7 +925,7 @@ if (staticRoots.length > 0) {
 
     const indexFile = Bun.file(join(clientDir, 'index.html'))
     if (await indexFile.exists()) {
-      return new Response(indexFile, {
+      return new Response(await indexFile.arrayBuffer(), {
         headers: {
           'Content-Type': 'text/html; charset=utf-8',
         },
@@ -940,7 +935,7 @@ if (staticRoots.length > 0) {
     if (servePublicAssets) {
       const publicIndex = Bun.file(join(publicDir, 'index.html'))
       if (await publicIndex.exists()) {
-        return new Response(publicIndex, {
+        return new Response(await publicIndex.arrayBuffer(), {
           headers: {
             'Content-Type': 'text/html; charset=utf-8',
           },
